@@ -5,118 +5,54 @@ import { useNavigate, NavigateFunction } from "react-router";
 import { FaucetInput } from './FaucetInput';
 import { IFaucetContext } from '../../common/FaucetContext';
 import { FaucetSession } from '../../common/FaucetSession';
-import { RestoreSession } from './RestoreSession';
 import { SlotOutlet } from '../../sdk/SlotOutlet';
 import { emitHook, emitHookSafe } from '../../sdk/hooks';
 import { PassportInfo } from '../passport/PassportInfo';
+import './FrontPage.scss';
+import { QmsLayout } from '../shared/QmsLayout';
 
 export interface IFrontPageProps {
   faucetContext: IFaucetContext;
   faucetConfig: IFaucetConfig;
   navigateFn: NavigateFunction;
-  defaultAddr?: string;
 }
 
-export interface IFrontPageState {
-  checkedStoredSession: boolean;
-}
-
-export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageState> {
+export class FrontPage extends React.PureComponent<IFrontPageProps> {
   private faucetInput = React.createRef<FaucetInput>();
 
-  constructor(props: IFrontPageProps) {
-    super(props);
-
-    this.state = {
-      checkedStoredSession: false,
-		};
-  }
-
-  public componentDidMount() {
-    if(!this.state.checkedStoredSession) {
-      let sessionJson = FaucetSession.recoverSessionInfo();
-      if(sessionJson) {
-        this.props.faucetContext.faucetApi.getSessionStatus(sessionJson.id).then((sessionInfo) => {
-          if(!sessionInfo)
-            return;
-          let actionLabel: string = null;
-          let actionFn: () => void;
-          switch(sessionInfo.status) {
-            case "claimable":
-              actionLabel = "Claim Rewards";
-              actionFn = () => this.props.navigateFn("/claim/" + sessionInfo.session);
-              break;
-            case "running":
-              // a module's session has that module's task, not "pow"
-              if(hasPlayableTask(sessionInfo.tasks)) {
-                actionLabel = sessionInfo.tasks.filter(t => t.module === "pow").length > 0 ? "Continue Mining" : "Continue Playing";
-                actionFn = () => this.props.navigateFn("/mine/" + sessionInfo.session);
-              }
-              else
-                return;
-              break;
-            default:
-              return;
-          }
-
-          this.props.faucetContext.showDialog({
-            title: "Restore Session",
-            size: "700px",
-            body: (
-              <RestoreSession
-                faucetConfig={this.props.faucetConfig}
-                sessionStatus={sessionInfo}
-              />
-            ),
-            applyButton: {
-              caption: actionLabel,
-              applyFn: actionFn,
-            },
-            closeButton: {
-              caption: "Start new session"
-            }
-          })
-        });
-      }
-    }
-  }
-
 	public render(): React.ReactElement<IFrontPageProps> {
-    let faucetImage: string;
-    if(this.props.faucetConfig.faucetImage) {
-      faucetImage = this.props.faucetConfig.faucetImage;
-      if(faucetImage.match(/^\/images\//) && this.props.faucetContext.faucetUrls.imagesUrl) {
-        faucetImage = this.props.faucetContext.faucetUrls.imagesUrl + faucetImage.substring(7);
-      }
-    }
-
     return (
-      <div className='page-frontpage'>
-        <div className='faucet-frontimage'>
-          {faucetImage ?
-            <img src={faucetImage} className="image" />
-          : null}
-        </div>
+      <QmsLayout faucetConfig={this.props.faucetConfig}>
+          <div className="page-frontpage qms-card qms-frontpage">
         <SlotOutlet slot="front.info" faucetConfig={this.props.faucetConfig} navigate={(path) => this.props.navigateFn(path)} />
         <FaucetInput 
           ref={this.faucetInput} 
           faucetContext={this.props.faucetContext} 
           faucetConfig={this.props.faucetConfig} 
-          defaultAddr={this.props.defaultAddr}
           submitInputs={(inputData) => this.onSubmitInputs(inputData)}/>
-        
-        <div className='faucet-description'>
-          {this.props.faucetConfig.faucetHtml ?
-            <div className="pow-home-container" dangerouslySetInnerHTML={{__html: this.props.faucetConfig.faucetHtml}} />
-          : null}
-        </div>
+          </div>
         <SlotOutlet slot="front.after" faucetConfig={this.props.faucetConfig} navigate={(path) => this.props.navigateFn(path)} />
-      </div>
+      </QmsLayout>
     );
 	}
 
   private async onSubmitInputs(inputData: any): Promise<void> {
     try {
+      if(!this.props.faucetConfig.modules.pow && !inputData.module) {
+        let activeSession = this.props.faucetContext.activeSession;
+        let recoveryInfo = activeSession ? {
+          id: activeSession.getSessionId(),
+          addr: activeSession.getTargetAddr(),
+        } : FaucetSession.recoverSessionInfo();
+        if(recoveryInfo?.addr && recoveryInfo.addr.toLowerCase() === inputData.addr?.toLowerCase()) {
+          let sessionStatus = await this.props.faucetContext.faucetApi.getSessionStatus(recoveryInfo.id);
+          if(sessionStatus.status === "claimable" && sessionStatus.target.toLowerCase() === inputData.addr.toLowerCase()) {
+            this.props.faucetContext.activeSession = new FaucetSession(this.props.faucetContext, sessionStatus.session, sessionStatus);
+            this.props.navigateFn("/claim/" + sessionStatus.session);
+            return;
+          }
+        }
+      }
       // a module may add to `inputData.params` here, or throw to refuse the start with a reason
       await emitHook("session.start", { input: inputData });
       let sessionInfo = await this.props.faucetContext.faucetApi.startSession(inputData);
@@ -198,6 +134,7 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
 
       switch(sessionInfo.status) {
         case "claimable":
+          FaucetSession.persistSessionInfo(session);
           // redirect to claim page
           console.log("redirect to claim page!", session);
           this.props.navigateFn("/claim/" + sessionInfo.session);
@@ -232,16 +169,12 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
 }
 
 export default (props) => {
-  const searchParams = new URLSearchParams(window.location.search);
-  const addressParam = searchParams.get('address');
-
   return (
     <FrontPage 
       {...props}
       faucetContext={useContext(FaucetPageContext)}
       faucetConfig={useContext(FaucetConfigContext)}
       navigateFn={useNavigate()}
-      defaultAddr={addressParam || undefined}
     />
   );
 };

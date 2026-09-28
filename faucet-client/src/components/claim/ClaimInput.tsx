@@ -4,6 +4,7 @@ import { FaucetCaptcha } from '../shared/FaucetCaptcha';
 
 export interface IClaimInputProps {
   faucetConfig: IFaucetConfig
+  caption?: string;
   submitInputs(inputs: any): Promise<void>;
 }
 
@@ -33,13 +34,11 @@ export class ClaimInput extends React.PureComponent<IClaimInputProps, IClaimInpu
             Captcha:
           </div>
           <div className="col">
-            <div className='faucet-captcha'>
-              <FaucetCaptcha 
-                faucetConfig={this.props.faucetConfig} 
-                ref={this.faucetCaptcha} 
-                variant='claim'
-              />
-            </div>
+            <FaucetCaptcha
+              faucetConfig={this.props.faucetConfig}
+              ref={this.faucetCaptcha}
+              variant='claim'
+            />
           </div>
         </div>
         : null}
@@ -49,7 +48,7 @@ export class ClaimInput extends React.PureComponent<IClaimInputProps, IClaimInpu
               className="btn btn-success start-action" 
               onClick={(evt) => this.onSubmitBtnClick()} 
               disabled={this.state.submitting}>
-                Claim Rewards
+                {this.state.submitting ? 'Sending…' : this.props.caption || 'Claim Rewards'}
             </button>
           </div>
         </div>

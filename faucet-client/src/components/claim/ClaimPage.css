@@ -62,4 +62,30 @@
   width: 18px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 216.4 232'%3E%3Cpath fill='%232b90d9' d='M212 139c-3 16-29 34-58 38-15 2-30 3-46 3-26-2-46-7-46-7v8c4 25 26 27 47 28 21 0 39-6 39-6l1 19s-14 8-41 10c-14 1-32-1-53-6C9 214 1 165 0 116V76c0-50 33-65 33-65C50 3 78 0 108 0h1c29 0 58 3 74 11 0 0 33 15 33 65 0 0 1 37-4 63' /%3E%3Cpath fill='%23fff' d='M178 80v61h-25V82c0-13-5-19-15-19-12 0-18 8-18 22v33H96V85c0-14-6-22-17-22s-16 6-16 19v59H39V80c0-12 3-22 9-30 7-7 16-11 26-11 13 0 22 5 28 15l6 10 6-10c6-10 16-15 28-15 11 0 19 4 26 11 6 8 10 18 10 30' /%3E%3C/svg%3E");
 }
+.qms-review-skeleton {
+  display: block;
+  background: #242540;
+  border-radius: 6px;
+  animation: qms-review-pulse 1.6s ease-in-out infinite;
+}
 
+.qms-review-skeleton--label { width: 128px; height: 14px; }
+.qms-card__amount > .qms-review-skeleton--amount { width: 120px; height: 72px; }
+.qms-review-skeleton--value { width: 45%; height: 16px; }
+.qms-review-skeleton--button { width: 100%; height: 52px; border-radius: 10px; }
+
+@keyframes qms-review-pulse {
+  50% { opacity: .45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qms-review-skeleton { animation: none; }
+}
+.qms-card__details .qms-card__text-row span {
+  font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+}
+.qms-card__pending { color: #b0c4f0; }
+.qms-card__progress > .is-pending { color: #6a6a88; }
+.qms-card__progress > .is-pending::before { background: #242540; }
+.qms-card__progress > .is-pending > span { background: #242540; }
+.qms-card__progress > .is-active > span { background: #121320; color: #b0c4f0; }

@@ -26,7 +26,13 @@ var webpackModuleConfigs = [
           test: /\.s?css$/,
           use: [
             MiniCssExtractPlugin.loader,
-            'css-loader',
+            {
+              loader: 'css-loader',
+              options: {
+                // Root-relative URLs are served by the faucet's existing static server.
+                url: { filter: (url) => !url.startsWith('/') },
+              },
+            },
             {
               loader: 'sass-loader',
               options: {

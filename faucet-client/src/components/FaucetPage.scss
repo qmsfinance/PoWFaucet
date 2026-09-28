@@ -1,4 +1,40 @@
 
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(/* webpackIgnore: true */ "/fonts/space-grotesk-400.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(/* webpackIgnore: true */ "/fonts/space-grotesk-500.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(/* webpackIgnore: true */ "/fonts/space-grotesk-700.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "DM Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(/* webpackIgnore: true */ "/fonts/dm-mono-latin.woff2") format("woff2");
+}
+
+.faucet-page a {
+  text-decoration: none;
+}
+
 html.powfaucet, html.powfaucet body {
   margin: 0;
   padding: 0;
@@ -10,16 +46,15 @@ html.powfaucet, html.powfaucet body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f0f0f0;
+  background-color: #070812;
 }
 
 .faucet-container {
-  padding: 8px;
-  margin: 8px;
-  background-color: white;
-  box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
-  transition: 0.3s;
+  width: 100%;
   max-width: 100vw;
+  margin: 0;
+  padding: 0;
+  background-color: #070812;
 }
 
 @import "../../node_modules/bootstrap/scss/functions";
@@ -59,14 +94,20 @@ html.powfaucet, html.powfaucet body {
   padding: 16px 0;
 }
 
-.faucet-loading .loading-spinner .spinner {
-  height: 30px;
+.faucet-loading .loading-spinner .loading-icon {
   margin: 0 16px;
 }
 
-.faucet-page .inline-spinner .spinner {
-  height: 20px;
-  margin: 0 8px;
+.faucet-page .inline-spinner {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+.faucet-page .inline-spinner .loading-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .faucet-page .faucet-notifications {
@@ -81,13 +122,16 @@ html.powfaucet, html.powfaucet body {
 }
 
 .faucet-page .faucet-footer {
-  position: fixed;
-  bottom: 0;
-  right: 0;
-  padding: 4px;
-  font-size: 12px;
-  color: #343a40;
-  pointer-events: none;
+  align-items: center;
+  color: #6a6a88;
+  display: flex;
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 11px;
+  gap: 24px;
+  justify-content: center;
+  letter-spacing: .12em;
+  padding: 20px;
+  text-transform: uppercase;
 }
 
 
@@ -124,18 +168,33 @@ html.powfaucet, html.powfaucet body {
 // "the general page layout looks broken in non-fullscreen mode". A definite
 // width does not move, and `max-width` still gives the phone what it needed.
 .faucet-page {
-  width: 450px;
-  max-width: 100%;
+  --qms-bg: #070812;
+  --qms-raised: #121320;
+  --qms-notes: #0b0c18;
+  --qms-line: #1c1d30;
+  --qms-line-strong: #242540;
+  --qms-text: #f4f5fb;
+  --qms-muted: #8b8ba8;
+  --qms-faint: #6a6a88;
+  --qms-error: #ff8585;
+  --qms-steel: #b0c4f0;
+  --qms-mint: #00e5b0;
+  --qms-font-mono: "DM Mono", ui-monospace, monospace;
+  background: #070812;
+  color: #f4f5fb;
+  display: grid;
+  font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  grid-template-rows: auto 1fr auto;
+  min-height: 100vh;
+  width: 100%;
 }
 
 .faucet-page:has(.page-mining), .faucet-page:has(.page-frontpage) {
-  width: 450px;
-  max-width: 100%;
+  width: 100%;
 }
 
 .faucet-page:has(.page-claim), .faucet-page:has(.page-details) {
-  width: 600px;
-  max-width: 100%;
+  width: 100%;
 }
 
 .faucet-page:has(.faucet-status) {
@@ -194,15 +253,16 @@ html.powfaucet, html.powfaucet body {
 }
 
 .faucet-page .faucet-title {
-  position: relative;
+  margin-bottom: 32px;
+  text-align: center;
 }
 
-.faucet-page .faucet-title .faucet-status-link {
-  position: absolute;
-  right: 0;
-  top: 0;
-  width: 50px;
-  height: 50px;
+.faucet-page .faucet-title h1 {
+  font-size: 39px;
+  font-weight: 500;
+  letter-spacing: -.02em;
+  line-height: 1.23;
+  margin: 0;
 }
 
 .faucet-page .pow-header {
@@ -306,3 +366,150 @@ html.powfaucet, html.powfaucet body {
   max-width: 700px;
 }
 
+.faucet-page .qms-header {
+  align-items: center;
+  border-bottom: 1px solid #1c1d30;
+  display: flex;
+  justify-content: space-between;
+  min-height: 71px;
+  padding: 22px 48px;
+}
+
+.faucet-page .qms-brand {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.faucet-page .qms-brand img {
+  display: block;
+  height: 26px;
+  width: 26px;
+}
+
+.faucet-page .qms-brand strong {
+  line-height: 26px;
+  color: #f4f5fb;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -.03em;
+}
+
+.faucet-page .qms-brand span,
+.faucet-page .qms-network-status {
+  color: #00e5b0;
+  color: #8b8ba8;
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.faucet-page .qms-network-status {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  display: flex;
+  gap: 8px;
+  padding: 0;
+}
+
+.qms-header__links { display: flex; align-items: center; gap: 28px; }
+.qms-header__docs { color: #c0c0d8; font-family: "DM Mono", monospace; font-size: 11px; letter-spacing: 1.54px; }
+.qms-footer__help { color: #8b8ba8; }
+.faucet-page .qms-header .qms-network-status { text-transform: none; }
+
+.faucet-page .qms-network-status i {
+  background: #00e5b0;
+  border-radius: 50%;
+  display: block;
+  height: 6px;
+  width: 6px;
+}
+
+.faucet-page .qms-network-status:focus-visible {
+  outline: 2px solid #b0c4f0;
+  outline-offset: 3px;
+}
+
+.faucet-page .qms-main-grid {
+  background-color: #070812;
+  background-image: linear-gradient(rgba(176, 196, 240, .06) 1px, transparent 1px), linear-gradient(90deg, rgba(176, 196, 240, .06) 1px, transparent 1px);
+  background-size: 72px 72px;
+  min-height: calc(100vh - 131px);
+  padding: 96px 24px;
+}
+
+.faucet-page .qms-content-frame {
+  margin: 0 auto;
+  max-width: 600px;
+}
+
+.faucet-page .faucet-body {
+  background: #121320;
+  border: 1px solid #242540;
+  border-radius: 16px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, .22);
+  padding: 24px;
+}
+
+.faucet-page .faucet-body .page-frontpage > .faucet-frontimage {
+  display: none;
+}
+
+.faucet-page .faucet-actions button {
+  background: #b0c4f0;
+  border-radius: 10px;
+  color: #070812;
+  font-family: inherit;
+  font-weight: 700;
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+
+.faucet-page .faucet-actions button:hover:not(:disabled) {
+  background: #c4d3f7;
+  transform: translateY(-1px);
+}
+
+.faucet-page .faucet-actions button.stop-action {
+  background: #ff8585;
+}
+
+.faucet-page .faucet-status-alerts .alert {
+  border: 1px solid #242540;
+  border-radius: 10px;
+  margin-bottom: 16px;
+}
+
+.faucet-page .faucet-notifications {
+  bottom: 20px;
+  right: 20px;
+  z-index: 1055;
+}
+
+@media screen and (max-width: 680px) {
+  .faucet-page .qms-header {
+    padding: 16px;
+  }
+
+  .faucet-page .qms-brand span {
+    display: none;
+  }
+
+  .faucet-page .qms-main-grid {
+    min-height: calc(100vh - 131px);
+    padding: 64px 16px;
+  }
+
+  .faucet-page .faucet-title {
+    margin-bottom: 24px;
+  }
+
+  .faucet-page .faucet-title h1 {
+    font-size: 31px;
+  }
+
+  .faucet-page .faucet-body {
+    padding: 16px;
+  }
+}

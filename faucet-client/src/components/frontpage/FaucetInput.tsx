@@ -1,3 +1,4 @@
+import { LoadingIcon } from '../shared/LoadingIcon';
 import React from 'react';
 import { IFaucetConfig } from '../../common/FaucetConfig';
 import { getPanels, IRegisteredPanel } from '../../sdk/slots';
@@ -7,11 +8,11 @@ import { AuthenticatoorLogin } from './authenticatoor/AuthenticatoorLogin';
 import { GithubLogin } from './github/GithubLogin';
 import { ZupassLogin } from './zupass/ZupassLogin';
 import VoucherInput, { IVoucherInputRef } from './voucher/VoucherInput';
+import { toReadableAmount } from '../../utils/ConvertHelpers';
 
 export interface IFaucetInputProps {
   faucetContext: IFaucetContext;
   faucetConfig: IFaucetConfig
-  defaultAddr?: string;
   submitInputs(inputs: any): Promise<void>;
 }
 
@@ -37,7 +38,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
 
     this.state = {
       submitting: false,
-      targetAddr: this.props.defaultAddr || "",
+      targetAddr: "",
       startModule: "",
       startMode: "",
 		};
@@ -49,19 +50,11 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
     let needZupassAuth = !!this.props.faucetConfig.modules.zupass && !!this.props.faucetConfig.modules.zupass.event;
     let needVoucher = !!this.props.faucetConfig.modules.voucher;
     let requestCaptcha = !!this.props.faucetConfig.modules.captcha?.requiredForStart;
-    let inputTypes: string[] = [];
-    if(this.props.faucetConfig.modules.ensname?.required) {
-      inputTypes.push("ENS name");
-    }
-    else {
-      inputTypes.push("ETH address");
-      if(this.props.faucetConfig.modules.ensname)
-        inputTypes.push("ENS name");
-    }
-
     let panels = getPanels("mining").filter((panel) => panel.modes && panel.modes.length > 0);
     let hasMining = !!this.props.faucetConfig.modules.pow;
     let playing = !!this.state.startModule;
+    let invalidAddress = !playing && !hasMining && this.state.targetAddr.length > 0 &&
+      (!/^0x[0-9a-fA-F]{40}$/.test(this.state.targetAddr) || /^0x0{40}$/i.test(this.state.targetAddr));
 
     let submitBtnCaption: string;
     // "does this session still mine" is the core's own question, and the mode the
@@ -78,17 +71,27 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
       submitBtnCaption = "Start Mining";
     }
     else {
-      submitBtnCaption = "Request Funds";
+      submitBtnCaption = "Send " + toReadableAmount(this.props.faucetConfig.maxClaim, this.props.faucetConfig.faucetCoinDecimals) + " Testnet " + this.props.faucetConfig.faucetCoinSymbol;
+    }
+    if(invalidAddress) {
+      submitBtnCaption = "Please enter a valid EVM address";
     }
 
     return (
-      <div className="faucet-inputs">
-        <input 
-          className="form-control" 
-          value={this.state.targetAddr} 
-          placeholder={"Please enter " + (inputTypes.join(" or "))} 
-          onChange={(evt) => this.setState({ targetAddr: evt.target.value })} 
-        />
+      <div className="faucet-inputs qms-faucet-inputs">
+        <label className="qms-faucet-inputs__label" htmlFor="faucet-wallet-address">Wallet address</label>
+        <div className="qms-faucet-inputs__wallet">
+          <input
+            id="faucet-wallet-address"
+            className="form-control"
+            value={this.state.targetAddr}
+            placeholder={this.props.faucetConfig.modules.ensname?.required ? "name.eth" : "0x…"}
+            onChange={(evt) => this.setState({ targetAddr: evt.target.value })}
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <button className="qms-faucet-inputs__paste" type="button" onClick={() => this.onPasteAddress()}>Paste</button>
+        </div>
         {needAuthenticatoor ?
           <AuthenticatoorLogin
             faucetConfig={this.props.faucetConfig}
@@ -121,22 +124,20 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
         : null}
         {panels.length > 0 ? this.renderStartModes(panels, hasMining) : null}
         {requestCaptcha ? 
-          <div className='faucet-captcha'>
-            <FaucetCaptcha 
-              faucetConfig={this.props.faucetConfig} 
-              ref={this.faucetCaptcha} 
-              variant='session'
-            />
-          </div>
+          <FaucetCaptcha
+            faucetConfig={this.props.faucetConfig}
+            ref={this.faucetCaptcha}
+            variant='session'
+          />
         : null}
         <div className="faucet-actions center">
           <button 
             className="btn btn-success start-action" 
             onClick={(evt) => this.onSubmitBtnClick()} 
-            disabled={this.state.submitting}>
+            disabled={this.state.submitting || invalidAddress}>
               {this.state.submitting ?
               <span className='inline-spinner'>
-                <img src={(this.props.faucetContext.faucetUrls.imagesUrl || "/images") + "/spinner.gif"} className="spinner" />
+                <LoadingIcon />
               </span>
               : null}
               {submitBtnCaption}
@@ -261,6 +262,15 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
       this.setState({
         submitting: false
       });
+    }
+  }
+
+  private async onPasteAddress(): Promise<void> {
+    try {
+      let targetAddr = await navigator.clipboard.readText();
+      this.setState({ targetAddr: targetAddr.trim() });
+    } catch {
+      this.props.faucetContext.showNotification("warning", "Clipboard access was denied. Paste your wallet address manually.");
     }
   }
 

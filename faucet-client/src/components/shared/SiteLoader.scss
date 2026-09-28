@@ -1,0 +1,28 @@
+.site-splash__mark {
+  width: 96px;
+  height: 96px;
+  overflow: visible;
+}
+
+.site-splash__fill {
+  animation: qms-splash-fill 500ms 900ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.site-splash__stroke {
+  animation: qms-splash-outline 500ms 1400ms ease-out both;
+}
+
+@keyframes qms-splash-fill {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes qms-splash-outline {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-splash__fill { animation: none; }
+  .site-splash__stroke { display: none; }
+}

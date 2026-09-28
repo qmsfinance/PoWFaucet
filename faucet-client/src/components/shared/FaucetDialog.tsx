@@ -1,5 +1,6 @@
 import React, { ReactElement } from 'react';
 import { Button, Modal } from 'react-bootstrap';
+import './FaucetDialog.scss';
 
 export interface IFaucetDialogProps {
   title: string;
@@ -32,7 +33,7 @@ export class FaucetDialog extends React.PureComponent<IFaucetDialogFullProps, IF
 
 	public render(): React.ReactElement<IFaucetDialogFullProps> {
     return (
-      <Modal container={this.props.container} show centered className="faucet-dialog" size={(this.props.size || undefined) as any} onHide={() => {
+      <Modal container={this.props.container} show centered className="faucet-dialog" backdropClassName="faucet-dialog-backdrop" size={(this.props.size || undefined) as any} onHide={() => {
         if(this.props.closeFn)
           this.props.closeFn();
       }}>

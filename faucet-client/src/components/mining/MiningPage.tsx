@@ -1,3 +1,4 @@
+import { LoadingIcon } from '../shared/LoadingIcon';
 import { IFaucetConfig } from '../../common/FaucetConfig';
 import { getPanels, IMiningPanelApi, IMiningPanelProps, IRegisteredPanel } from '../../sdk/slots';
 import { SlotOutlet } from '../../sdk/SlotOutlet';
@@ -16,6 +17,7 @@ import { PoWMinerStatus } from './PoWMinerStatus';
 import { toReadableAmount } from '../../utils/ConvertHelpers';
 import { PassportInfo } from '../passport/PassportInfo';
 import { ConnectionAlert } from './ConnectionAlert';
+import '../OperationalPages.scss';
 
 /** how long to wait for the faucet to resolve the module's blocking task on Leave */
 const LEAVE_STATUS_RETRIES = 8;
@@ -395,7 +397,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
       return (
         <div className="faucet-loading">
           <div className="loading-spinner">
-            <img src={(this.props.pageContext.faucetUrls.imagesUrl || "/images") + "/spinner.gif"} className="spinner" />
+            <LoadingIcon />
             <span className="spinner-text">Loading...</span>
           </div>
         </div>
@@ -647,4 +649,3 @@ export default (props) => {
     />
   );
 };
-

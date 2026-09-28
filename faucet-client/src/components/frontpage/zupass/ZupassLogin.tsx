@@ -1,3 +1,4 @@
+import { LoadingIcon } from '../../shared/LoadingIcon';
 import React from 'react';
 import { OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { IFaucetConfig } from '../../../common/FaucetConfig';
@@ -105,7 +106,7 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
           <a href="#" onClick={(evt) => evt.preventDefault()}>
             {this.state.popupOpen ?
               <span className='inline-spinner'>
-                <img src="/images/spinner.gif" className="spinner" />
+                <LoadingIcon />
               </span>
             : null}
             Login with Zupass

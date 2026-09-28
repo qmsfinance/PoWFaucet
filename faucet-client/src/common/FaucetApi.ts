@@ -1,3 +1,4 @@
+import { loadRuntimeConfig } from './RuntimeConfig';
 import { IClientClaimStatusRsp, IClientFaucetStatusRsp } from "../types/FaucetStatus";
 import { IPassportInfo } from "../types/PassportInfo";
 import { IFaucetConfig } from "./FaucetConfig";
@@ -105,9 +106,11 @@ export class FaucetApi {
   }
 
   public getFaucetConfig(): Promise<IFaucetConfig> {
-    return this.apiGet("/getFaucetConfig", {
-      cliver: FAUCET_CLIENT_VERSION,
-    }).then((config) => {
+    return Promise.all([
+      this.apiGet("/getFaucetConfig", { cliver: FAUCET_CLIENT_VERSION }),
+      loadRuntimeConfig(),
+    ]).then(([config, runtimeConfig]) => {
+      Object.assign(config, runtimeConfig);
       this.faucetTime.syncTimeOffset(config.time);
       return config;
     });

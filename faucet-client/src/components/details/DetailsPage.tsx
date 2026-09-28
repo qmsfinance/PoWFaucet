@@ -1,3 +1,4 @@
+import { LoadingIcon } from '../shared/LoadingIcon';
 import { IFaucetConfig } from '../../common/FaucetConfig';
 import { FaucetConfigContext, FaucetPageContext } from '../FaucetPage';
 import { SlotOutlet } from '../../sdk/SlotOutlet';
@@ -114,7 +115,7 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
     console.log("render DetailsPage");
     
     return (
-      <div className='page-claim'>
+      <div className='page-claim page-details'>
         <div className='container'>
           <div className='row'>
             <div className='col'>
@@ -141,7 +142,7 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
       return (
         <div className="faucet-loading">
           <div className="loading-spinner">
-            <img src={(this.props.pageContext.faucetUrls.imagesUrl || "/images") + "/spinner.gif"} className="spinner" />
+            <LoadingIcon />
             <span className="spinner-text">Loading Session...</span>
           </div>
         </div>
@@ -349,4 +350,3 @@ export default (props) => {
     />
   );
 };
-

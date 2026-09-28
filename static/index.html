@@ -4,29 +4,45 @@
     <title>PoW Faucet</title>
     <!-- pow-faucet-header -->
     <meta charset='utf-8'>
-    <link rel="Stylesheet" type="text/css" href="/css/gh-fork-ribbon.css">
+    <script id="qwap-splash-gate">try{if(!sessionStorage.getItem('qwap:splash')){document.documentElement.dataset.splash='1';sessionStorage.setItem('qwap:splash','1')}}catch(e){}</script>
+    <script id="qwap-theme-gate">try{var n='qwap:theme',o='qms:theme',v=localStorage.getItem(n)||localStorage.getItem(o),d=document.documentElement,p=v==='light'||v==='dark'||v==='system'?v:'dark',t=p==='light'||p==='dark'?p:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');if(!localStorage.getItem(n)&&(v==='light'||v==='dark'||v==='system'))localStorage.setItem(n,v);d.classList.remove('light','dark');d.classList.add(t);d.dataset.themePreference=p;d.style.colorScheme=t}catch(e){}</script>
     <link rel="Stylesheet" type="text/css" href="/css/powfaucet.css">
-    <style>html, body { margin: 0; padding: 0; height: 100%; }</style>
+    <style>
+      html, body { margin: 0; padding: 0; height: 100%; }
+      .powfaucet-booting .pow-faucet { visibility: hidden; }
+      html { background: #070812; }
+      html.light { background: #f4f5fb; }
+      .site-splash { display: none; position: fixed; inset: 0; z-index: 100; background: #070812; color: #f4f5fb; }
+      html.light .site-splash { background: #f4f5fb; color: #070812; }
+      html[data-splash] .site-splash { display: flex; align-items: center; justify-content: center; }
+      html[data-splash] body { overflow: hidden; }
+    </style>
     <link href="/site.webmanifest" rel="manifest">
     <link href="/favicon/apple-touch-icon.png" rel="apple-touch-icon">
     <link href="/favicon/favicon-32x32.png" rel="icon" sizes="32x32">
     <link href="/favicon/favicon-16x16.png" rel="icon" sizes="16x16">
   </head>
-  <body>
-    <div class="faucet-wrapper">
+  <body class="powfaucet-booting">
+    <div id="site-splash-root">
+      <div class="site-splash" role="status" aria-label="Loading QMS"></div>
+    </div>
+    <script>if(document.documentElement.dataset.splash)setTimeout(function(){document.documentElement.removeAttribute('data-splash');var c=document.getElementById('app-content');if(c){c.removeAttribute('inert');c.removeAttribute('aria-hidden')}},8500)</script>
+    <div id="app-content" class="faucet-wrapper">
       <div class="faucet-container faucet-bootstrap">
         <div class="pow-faucet" data-powfaucet="default">
           <div class="faucet-page">
             <div class="page-frontpage">
               <!-- pow-faucet-content -->
-              <noscript>JavaScript is required to use this faucet.</noscript>
+              <noscript>
+                <style>.powfaucet-booting .pow-faucet { visibility: visible; }</style>
+                JavaScript is required to use this faucet.
+              </noscript>
               <!-- pow-faucet-footer -->
             </div>
           </div>
         </div>
       </div>
     </div>
-    <a href="https://github.com/pk910/PoWFaucet" class="github-fork-ribbon fixed" title="Fork me on GitHub" data-ribbon="Fork me on GitHub" target="_blank">Fork me on GitHub</a>
     <script src="/js/powfaucet.js"></script>
   </body>
 </html>

@@ -1,3 +1,4 @@
+import { LoadingIcon } from '../shared/LoadingIcon';
 import React from 'react';
 import { OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { IFaucetConfig } from '../../common/FaucetConfig';
@@ -99,7 +100,7 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
       return (
         <div className="faucet-loading">
           <div className="loading-spinner">
-            <img src={(this.props.pageContext.faucetUrls.imagesUrl || "/images") + "/spinner.gif"} className="spinner" />
+            <LoadingIcon />
             <span className="spinner-text">Loading passport details...</span>
           </div>
         </div>
