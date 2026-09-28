@@ -1,0 +1,122 @@
+name: qms-faucet-image
+
+# Build the QMS faucet (this repo: pk910/PoWFaucet with the QMS UI) and publish it to ECR,
+# then tell argocd-nonprod. Same shape as the other QMS image pipelines (qubo-pouw-api,
+# dex-*): this repo announces a published tag, and which networks take it is
+# argocd-nonprod's business, not this workflow's.
+#
+# Upstream's own workflows came with the fork and publish to Docker Hub and GitHub
+# releases; they are disabled in this repo's Actions settings rather than deleted, so the
+# tree stays diffable against upstream.
+#
+# ECR only, no GHCR: nothing pulls this image from a second registry.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  id-token: write # assume the ECR push role
+  contents: read
+
+concurrency:
+  group: qms-faucet-image-${{ github.ref }}
+
+env:
+  ECR_REGISTRY: 876524020631.dkr.ecr.eu-central-1.amazonaws.com
+  IMAGE: qms/faucet
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
+      # Fixed width: bare --short is adaptive and would change the tag scheme the day
+      # the repo grows enough to need more characters.
+      - name: Resolve the tag
+        id: build
+        run: echo "tag=$(git rev-parse --short=10 HEAD)" >> "$GITHUB_OUTPUT"
+
+      # Sets AWS_* env for the ECR calls below.
+      - uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
+        with:
+          role-to-assume: arn:aws:iam::876524020631:role/qms-nonprod-faucet-image-publisher
+          aws-region: eu-central-1
+
+      # The runner image has no AWS CLI; this action logs docker in via the SDK.
+      - uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2.1.6
+
+      # ECR tags are immutable, so a re-push fails rather than replacing. Re-running a
+      # build whose image is already published is the normal re-run path, so detect it
+      # and skip to the announce.
+      - name: Guard on the existing tag
+        id: guard
+        env:
+          DOCKER_CLI_EXPERIMENTAL: enabled
+          TAG: ${{ steps.build.outputs.tag }}
+        run: |
+          # Only "manifest unknown" means the tag is free. Any other failure (auth,
+          # network) must fail the job, not fall through to a rebuild.
+          if out=$(docker manifest inspect "$ECR_REGISTRY/$IMAGE:$TAG" 2>&1); then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "$TAG already published, nothing to build"
+          elif echo "$out" | grep -qiE 'manifest unknown|no such manifest|not found'; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$out"
+            exit 1
+          fi
+
+      - name: Build and push
+        if: steps.guard.outputs.exists == 'false'
+        env:
+          TAG: ${{ steps.build.outputs.tag }}
+        # --provenance/--sbom=false: buildkit's default attestations wrap the result in
+        # an OCI index, which ECR basic scanning cannot scan. --platform: nodes are amd64.
+        run: |
+          DOCKER_BUILDKIT=1 docker build \
+            --platform linux/amd64 \
+            --provenance=false --sbom=false \
+            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --label "org.opencontainers.image.version=$TAG" \
+            --label "org.opencontainers.image.revision=$(git rev-parse HEAD)" \
+            -t "$ECR_REGISTRY/$IMAGE:$TAG" \
+            .
+          docker push "$ECR_REGISTRY/$IMAGE:$TAG"
+          echo "published $IMAGE:$TAG"
+
+      # Announce the published tag to argocd-nonprod: the tag, nothing else. Runs even
+      # when the guard skipped the build: re-announcing is the normal re-run path and the
+      # far side is idempotent.
+      #
+      # `actions: write` only — the commit is made by argocd-nonprod's own GITHUB_TOKEN,
+      # so no token that can write content to that repo exists here.
+      - name: Mint an installation token for qmsfinance/argocd-nonprod
+        if: github.ref == 'refs/heads/master'
+        id: deploy
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.QMS_CI_APP_CLIENT_ID }}
+          private-key: ${{ secrets.QMS_CI_APP_PRIVATE_KEY }}
+          owner: qmsfinance
+          repositories: argocd-nonprod
+          permission-actions: write
+
+      - name: Announce the tag to argocd-nonprod
+        if: github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ steps.deploy.outputs.token }}
+          TAG: ${{ steps.build.outputs.tag }}
+        # Raw REST rather than `gh workflow run`: that resolves the target repo's
+        # default branch over GraphQL, which an installation token scoped to
+        # `actions: write` alone cannot read. Naming the ref keeps the token at one
+        # permission.
+        run: |
+          printf '{"ref":"main","inputs":{"tag":"%s"}}' "$TAG" |
+            gh api -X POST \
+              repos/qmsfinance/argocd-nonprod/actions/workflows/faucet-image-published.yml/dispatches \
+              --input -
