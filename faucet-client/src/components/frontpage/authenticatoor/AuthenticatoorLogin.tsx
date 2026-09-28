@@ -1,3 +1,4 @@
+import { LoadingIcon } from '../../shared/LoadingIcon';
 import React from 'react';
 import { Tooltip } from 'react-bootstrap';
 import { OverlayChildren } from 'react-bootstrap/esm/Overlay';
@@ -130,7 +131,7 @@ export class AuthenticatoorLogin extends React.PureComponent<IAuthenticatoorLogi
           <a href="#" onClick={(evt) => { evt.preventDefault(); this.onLoginClick() }}>
             {(this.state.scriptLoading || (this.state.scriptLoaded && !this.state.loginInfo && !this.state.scriptError)) ?
               <span className='inline-spinner'>
-                <img src={(this.props.faucetContext.faucetUrls.imagesUrl || "/images") + "/spinner.gif"} className="spinner" />
+                <LoadingIcon />
               </span>
             : null}
             Login

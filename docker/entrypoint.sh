@@ -1,6 +1,18 @@
 #!/bin/bash
 set -e
 
+if [ -n "$FAUCET_NETWORK" ]; then
+  case "$FAUCET_NETWORK" in
+    devnet|stagenet)
+      printf '{"network":"%s"}\n' "$FAUCET_NETWORK" > /app/static/config.json
+      ;;
+    *)
+      echo "Unsupported FAUCET_NETWORK: $FAUCET_NETWORK (expected devnet or stagenet)" >&2
+      exit 1
+      ;;
+  esac
+fi
+
 if [ -z "$DISABLE_NGINX" ]; then
   # Enable nginx access log to stdout if requested
   if [ "$FAUCET_NGINX_LOG" = "1" ]; then

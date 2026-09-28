@@ -1,0 +1,10 @@
+.loading-icon {
+  flex-shrink: 0;
+  vertical-align: middle;
+  transform-origin: center;
+  animation: loading-icon-spin 1s linear infinite;
+}
+
+@keyframes loading-icon-spin {
+  to { transform: rotate(360deg); }
+}
