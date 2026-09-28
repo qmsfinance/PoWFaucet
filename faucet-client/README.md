@@ -21,8 +21,8 @@ The JS bundle includes these predefined networks:
 
 | Selector | Network | Chain ID | RPC |
 | --- | --- | --- | --- |
-| `stagenet` (default) | QMS Stagenet / net1 | 424242 | https://rpc.net1.test-qms.com |
-| `devnet` | QMS devnet / net2 | 424243 | https://rpc.net2.test-qms.com |
+| `stagenet` | QMS Stagenet / net1 | 424242 | https://rpc.net1.test-qms.com |
+| `devnet` (default) | QMS devnet / net2 | 424243 | https://rpc.net2.test-qms.com |
 
 Each preset also contains its explorer, DEX API, and native currency details.
 The selected preset controls displayed network details and transaction explorer
