@@ -16,6 +16,7 @@ import { PoWMinerStatus } from './PoWMinerStatus';
 import { toReadableAmount } from '../../utils/ConvertHelpers';
 import { PassportInfo } from '../passport/PassportInfo';
 import { ConnectionAlert } from './ConnectionAlert';
+import '../OperationalPages.scss';
 
 /** how long to wait for the faucet to resolve the module's blocking task on Leave */
 const LEAVE_STATUS_RETRIES = 8;
@@ -647,4 +648,3 @@ export default (props) => {
     />
   );
 };
-

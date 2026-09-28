@@ -9,6 +9,7 @@ import { RestoreSession } from './RestoreSession';
 import { SlotOutlet } from '../../sdk/SlotOutlet';
 import { emitHook, emitHookSafe } from '../../sdk/hooks';
 import { PassportInfo } from '../passport/PassportInfo';
+import './FrontPage.scss';
 
 export interface IFrontPageProps {
   faucetContext: IFaucetContext;
@@ -91,7 +92,15 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
     }
 
     return (
-      <div className='page-frontpage'>
+      <div className='page-frontpage qms-frontpage'>
+        <section className="qms-frontpage__hero">
+          <div className="qms-frontpage__grid" aria-hidden="true" />
+          <div className="qms-frontpage__intro">
+            <p>QMS test network</p>
+            <h1>Get {this.props.faucetConfig.faucetCoinSymbol}</h1>
+            <span>Request test tokens for building and testing on QMS.</span>
+          </div>
+          <div className="qms-frontpage__card">
         <div className='faucet-frontimage'>
           {faucetImage ?
             <img src={faucetImage} className="image" />
@@ -104,12 +113,23 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
           faucetConfig={this.props.faucetConfig} 
           defaultAddr={this.props.defaultAddr}
           submitInputs={(inputData) => this.onSubmitInputs(inputData)}/>
+          </div>
+        </section>
         
-        <div className='faucet-description'>
+        <section className='faucet-description qms-frontpage__notes'>
+          <div className="qms-frontpage__notes-heading">
+            <span>Notes</span>
+            <h2>Good to know</h2>
+          </div>
           {this.props.faucetConfig.faucetHtml ?
             <div className="pow-home-container" dangerouslySetInnerHTML={{__html: this.props.faucetConfig.faucetHtml}} />
           : null}
-        </div>
+          <div className="qms-frontpage__note-grid">
+            <div><b>Test tokens only</b><span>Use them to build and test on the QMS network.</span></div>
+            <div><b>Wallet required</b><span>Double-check the destination address before starting.</span></div>
+            <div><b>Session based</b><span>Complete the requested task to receive your funds.</span></div>
+          </div>
+        </section>
         <SlotOutlet slot="front.after" faucetConfig={this.props.faucetConfig} navigate={(path) => this.props.navigateFn(path)} />
       </div>
     );

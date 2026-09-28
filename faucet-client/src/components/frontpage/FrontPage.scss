@@ -1,0 +1,78 @@
+.faucet-page:has(.qms-frontpage) {
+  width: 100%;
+  color: #f4f5fb;
+  background: #070812;
+}
+
+.faucet-page:has(.qms-frontpage) .faucet-title { display: none; }
+
+.faucet-page:has(.qms-frontpage) .qms-main-grid { min-height: 0; padding: 0; }
+.faucet-page:has(.qms-frontpage) .qms-content-frame { height: 100%; max-width: none; }
+.faucet-page:has(.qms-frontpage) .faucet-body { height: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+
+.qms-frontpage {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #070812;
+  font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+}
+
+.qms-frontpage__network, .qms-frontpage__intro p, .qms-frontpage__footer { color: #8b8ba8; font-family: "DM Mono", ui-monospace, monospace; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+
+.qms-frontpage__hero { position: relative; padding: 72px 24px 64px; isolation: isolate; }
+.qms-frontpage__grid { position: absolute; z-index: -1; inset: 0; opacity: .7; background-image: linear-gradient(rgba(176,196,240,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(176,196,240,.06) 1px, transparent 1px); background-size: 56px 56px; }
+.qms-frontpage__intro { display: grid; justify-items: center; gap: 14px; margin: 0 auto 36px; text-align: center; }
+.qms-frontpage__intro p { margin: 0; }
+.qms-frontpage__intro h1 { margin: 0; font-size: clamp(39px, 10vw, 49px); font-weight: 500; line-height: 1; letter-spacing: -.04em; }
+.qms-frontpage__intro span { max-width: 29ch; color: #8b8ba8; font-size: 16px; line-height: 1.5; }
+.qms-frontpage__card { width: min(100%, 480px); margin: 0 auto; border: 1px solid #242540; border-radius: 16px; background: #121320; box-shadow: 0 18px 42px rgba(0, 0, 0, .26); }
+.qms-frontpage .faucet-frontimage { padding: 0; text-align: center; }
+.qms-frontpage .faucet-frontimage:empty { display: none; }
+.qms-frontpage .faucet-frontimage .image { display: block; max-width: 100%; }
+
+.qms-faucet-inputs { display: grid; gap: 16px; padding: 24px; }
+.qms-faucet-inputs__label { color: #c0c0d8; font-size: 13px; line-height: 18px; }
+.qms-faucet-inputs__wallet { display: flex; align-items: center; min-height: 54px; gap: 6px; padding: 4px 4px 4px 14px; border: 1px solid #242540; border-radius: 10px; background: #070812; transition: border-color .15s, box-shadow .15s; }
+.qms-faucet-inputs__wallet:focus-within { border-color: #b0c4f0; box-shadow: 0 0 0 3px rgba(176,196,240,.16); }
+.faucet-page .qms-frontpage .qms-faucet-inputs .form-control { min-width: 0; flex: 1; border: 0; padding: 0; color: #f4f5fb; background: transparent; box-shadow: none; font-family: "DM Mono", ui-monospace, monospace; font-size: 14px; outline: 0; }
+.qms-faucet-inputs .form-control::placeholder { color: #8b8ba8; }
+.qms-faucet-inputs__paste { min-height: 44px; border: 0; border-radius: 7px; padding: 0 14px; color: #c0c0d8; background: #1c1d30; font-family: "DM Mono", ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.qms-faucet-inputs__paste:hover { color: #f4f5fb; background: #242540; }
+.qms-frontpage .faucet-auth, .qms-frontpage .faucet-authenticatoor-auth, .qms-frontpage .faucet-zupass-auth { margin: 0; padding: 12px; border: 1px solid #242540; border-radius: 10px; background: #0b0c18; }
+.qms-frontpage .faucet-auth .auth-field .auth-info, .qms-frontpage .faucet-authenticatoor-auth .auth-field .auth-info, .qms-frontpage .faucet-zupass-auth .auth-field .auth-info { color: #c0c0d8; }
+.qms-frontpage .faucet-start-modes { display: grid; gap: 10px; }
+.qms-frontpage .start-modes-label { color: #c0c0d8; font-size: 13px; }
+.qms-frontpage .start-modes-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.qms-frontpage .start-mode { border-color: #3a3a58; color: #c4d3f7; }
+.qms-frontpage .start-mode.active { border-color: #b0c4f0; background: #b0c4f0; color: #070812; }
+.qms-frontpage .voucher-input-container { margin: 0 !important; }
+.qms-frontpage .voucher-input-container .form-control { padding: 6px 10px; border: 1px solid #242540; border-radius: 7px; background: #070812; }
+.qms-frontpage .faucet-actions { margin: 0; }
+.faucet-page .qms-frontpage .faucet-actions button.start-action { border-radius: 10px; background: #b0c4f0; color: #070812; font-weight: 700; transition: transform .15s, background .15s; }
+.qms-frontpage .faucet-actions button.start-action:hover:not(:disabled) { background: #c4d3f7; transform: translateY(-1px); }
+.qms-frontpage .faucet-actions button:disabled { background: #3a3a58; color: #8b8ba8; }
+
+.qms-frontpage__notes { flex: 1; margin: 0; padding: 48px max(24px, calc((100vw - 1120px) / 2)); border-top: 1px solid #1c1d30; color: #c0c0d8; background: #0b0c18; }
+.qms-frontpage__notes-heading { display: grid; gap: 8px; margin-bottom: 32px; }
+.qms-frontpage__notes-heading span { color: #8b8ba8; font-family: "DM Mono", ui-monospace, monospace; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+.qms-frontpage__notes-heading h2 { margin: 0; color: #f4f5fb; font-size: 25px; font-weight: 500; letter-spacing: -.02em; }
+.qms-frontpage__notes .pow-home-container:empty { display: none; }
+.qms-frontpage__notes .pow-home-container { margin-bottom: 28px; color: #c0c0d8; }
+.qms-frontpage__note-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
+.qms-frontpage__note-grid div { display: grid; gap: 8px; border-top: 1px solid #242540; padding-top: 15px; }
+.qms-frontpage__note-grid b { color: #b0c4f0; font-family: "DM Mono", ui-monospace, monospace; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+.qms-frontpage__note-grid span { color: #c0c0d8; font-size: 14px; line-height: 1.5; }
+.qms-frontpage__footer { padding: 20px 24px; text-align: center; color: #6a6a88; }
+
+@media (max-width: 420px) {
+  .qms-frontpage__hero, .qms-frontpage__notes { padding-right: 16px; padding-left: 16px; }
+  .qms-faucet-inputs { padding: 18px; }
+  .qms-frontpage__hero { padding-top: 56px; }
+  .qms-frontpage__intro h1 { font-size: 38px; }
+}
+
+@media (max-width: 680px) {
+  .qms-frontpage__note-grid { grid-template-columns: 1fr; gap: 20px; }
+}

@@ -49,16 +49,6 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
     let needZupassAuth = !!this.props.faucetConfig.modules.zupass && !!this.props.faucetConfig.modules.zupass.event;
     let needVoucher = !!this.props.faucetConfig.modules.voucher;
     let requestCaptcha = !!this.props.faucetConfig.modules.captcha?.requiredForStart;
-    let inputTypes: string[] = [];
-    if(this.props.faucetConfig.modules.ensname?.required) {
-      inputTypes.push("ENS name");
-    }
-    else {
-      inputTypes.push("ETH address");
-      if(this.props.faucetConfig.modules.ensname)
-        inputTypes.push("ENS name");
-    }
-
     let panels = getPanels("mining").filter((panel) => panel.modes && panel.modes.length > 0);
     let hasMining = !!this.props.faucetConfig.modules.pow;
     let playing = !!this.state.startModule;
@@ -82,13 +72,20 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
     }
 
     return (
-      <div className="faucet-inputs">
-        <input 
-          className="form-control" 
-          value={this.state.targetAddr} 
-          placeholder={"Please enter " + (inputTypes.join(" or "))} 
-          onChange={(evt) => this.setState({ targetAddr: evt.target.value })} 
-        />
+      <div className="faucet-inputs qms-faucet-inputs">
+        <label className="qms-faucet-inputs__label" htmlFor="faucet-wallet-address">Wallet address</label>
+        <div className="qms-faucet-inputs__wallet">
+          <input
+            id="faucet-wallet-address"
+            className="form-control"
+            value={this.state.targetAddr}
+            placeholder={this.props.faucetConfig.modules.ensname?.required ? "name.eth" : "0x…"}
+            onChange={(evt) => this.setState({ targetAddr: evt.target.value })}
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <button className="qms-faucet-inputs__paste" type="button" onClick={() => this.onPasteAddress()}>Paste</button>
+        </div>
         {needAuthenticatoor ?
           <AuthenticatoorLogin
             faucetConfig={this.props.faucetConfig}
@@ -261,6 +258,15 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
       this.setState({
         submitting: false
       });
+    }
+  }
+
+  private async onPasteAddress(): Promise<void> {
+    try {
+      let targetAddr = await navigator.clipboard.readText();
+      this.setState({ targetAddr: targetAddr.trim() });
+    } catch {
+      this.props.faucetContext.showNotification("warning", "Clipboard access was denied. Paste your wallet address manually.");
     }
   }
 

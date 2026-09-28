@@ -219,17 +219,29 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
       }}>
         <FaucetConfigContext.Provider value={this.state.faucetConfig}>
           <FaucetPageContext.Provider value={this.pageContext}>
-            <div className="faucet-title">
-              <h1 className="center">{this.state.faucetConfig.faucetTitle}</h1>
-              <div className="faucet-status-link" onClick={() => this.onFaucetStatusClick()}></div>
-            </div>
+            <header className="qms-header">
+              <div className="qms-brand" aria-label="QMS Faucet">
+                <img src={(this.pageContext.faucetUrls.imagesUrl || "/images") + "/qms-mark.svg"} alt="" width="26" height="26" />
+                <strong>QMS</strong>
+                <span>Faucet</span>
+              </div>
+              <span className="faucet-status-link qms-network-status" onClick={() => this.onFaucetStatusClick()}>
+                <i aria-hidden="true" />
+                {this.state.faucetConfig.faucetCoinSymbol || "Network"}
+              </span>
+            </header>
             <SlotOutlet slot="header" faucetConfig={this.state.faucetConfig} navigate={(path) => { location.hash = path; }} />
-            {this.renderStatusAlerts()}
-            <div className="faucet-body">
-              {this.props.children && (!Array.isArray(this.props.children) || this.props.children.length > 0) ? this.props.children :
-              <Router>
-                <PageHookObserver />
-                <Routes>
+            <main className="qms-main-grid">
+              <div className="qms-content-frame">
+                <div className="faucet-title">
+                  <h1>{this.state.faucetConfig.faucetTitle}</h1>
+                </div>
+                {this.renderStatusAlerts()}
+                <div className="faucet-body">
+                  {this.props.children && (!Array.isArray(this.props.children) || this.props.children.length > 0) ? this.props.children :
+                  <Router>
+                    <PageHookObserver />
+                    <Routes>
                   <Route
                     path='/'
                     element={(
@@ -281,16 +293,19 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
                         : <route.component />}
                     />
                   ))}
-                </Routes>
-              </Router>
-              }
-            </div>
+                    </Routes>
+                  </Router>
+                  }
+                </div>
+              </div>
+            </main>
             {this.renderDialogs()}
             {this.renderNotifications()}
             <SlotOutlet slot="footer" faucetConfig={this.state.faucetConfig} navigate={(path) => { location.hash = path; }} />
-            <div className='faucet-footer'>
-              <div className="faucet-client-version">v{FAUCET_CLIENT_VERSION}</div>
-            </div>
+            <footer className='faucet-footer'>
+              <span>© {new Date().getFullYear()} QMS Network</span>
+              <span className="faucet-client-version">v{FAUCET_CLIENT_VERSION}</span>
+            </footer>
           </FaucetPageContext.Provider>
         </FaucetConfigContext.Provider>
       </div>

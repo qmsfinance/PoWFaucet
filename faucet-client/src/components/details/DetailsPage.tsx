@@ -114,7 +114,7 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
     console.log("render DetailsPage");
     
     return (
-      <div className='page-claim'>
+      <div className='page-claim page-details'>
         <div className='container'>
           <div className='row'>
             <div className='col'>
@@ -349,4 +349,3 @@ export default (props) => {
     />
   );
 };
-
