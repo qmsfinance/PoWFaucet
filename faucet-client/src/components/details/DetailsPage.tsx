@@ -1,3 +1,4 @@
+import { LoadingIcon } from '../shared/LoadingIcon';
 import { IFaucetConfig } from '../../common/FaucetConfig';
 import { FaucetConfigContext, FaucetPageContext } from '../FaucetPage';
 import { SlotOutlet } from '../../sdk/SlotOutlet';
@@ -154,10 +155,17 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
 
 	public render(): React.ReactElement<IDetailsPageProps> {
     return (
-      <div className='page-details'>
-        {this.renderSession()}
-        <SlotOutlet slot="details.section" faucetConfig={this.props.faucetConfig}
-          sessionId={this.props.sessionId} navigate={(path) => this.props.navigateFn(path)} />
+      <div className='page-claim page-details'>
+        <div className='container'>
+          <div className='row'>
+            <div className='col'>
+              <h5>Session Details</h5>
+            </div>
+          </div>
+          {this.renderSession()}
+          <SlotOutlet slot="details.section" faucetConfig={this.props.faucetConfig}
+            sessionId={this.props.sessionId} navigate={(path) => this.props.navigateFn(path)} />
+        </div>
       </div>
     )
 	}
@@ -199,7 +207,7 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
       return (
         <div className="faucet-loading">
           <div className="loading-spinner">
-            <img src={(this.props.pageContext.faucetUrls.imagesUrl || "/images") + "/spinner.gif"} className="spinner" />
+            <LoadingIcon />
             <span className="spinner-text">Loading Session...</span>
           </div>
         </div>

@@ -94,4 +94,3 @@ function checkFileExists(filename, dstpath) {
   console.log("build failed: ", err);
   process.exit(1);
 });
-
