@@ -5,6 +5,7 @@ import { captureAuthenticatoorFragment } from './common/AuthenticatoorFragment';
 import * as powfaucet from '.'
 import { buildClientSdk } from './sdk/sdk';
 import { getCoreFlags } from './sdk/flags';
+import { SiteLoader } from './components/shared/SiteLoader';
 
 export function initializeFaucet(container: Element, faucetProps: IFaucetPageProps): { element: ReactElement, instance: FaucetPage } {
   let res: { element: ReactElement, instance: FaucetPage } = {
@@ -58,6 +59,9 @@ export function initializeFaucet(container: Element, faucetProps: IFaucetPagePro
   // parsing. Rendering here would beat every module to it, and a panel registered by one
   // would arrive after the page had already decided it did not exist.
   let boot = () => {
+    let splashContainer = document.getElementById("site-splash-root");
+    if(splashContainer)
+      createRoot(splashContainer).render(React.createElement(SiteLoader));
     var container = document.querySelector(".pow-faucet");
     if(container && container.hasAttribute("data-powfaucet")) {
       let faucetProps: IFaucetPageProps = {};

@@ -37,7 +37,8 @@ COPY --from=build-server-env /build/bundle ./bundle
 COPY --from=build-client-env /build/static ./static
 COPY ./faucet-config.example.yaml .
 RUN cp ./static/index.html ./static/index.seo.html \
-    && chmod 777 ./static/index.seo.html
+    && chmod 777 ./static/index.seo.html \
+    && chmod 666 ./static/config.json
 
 # Writable data directory for config, database, and other runtime files
 RUN mkdir -p /data && chmod 777 /data
