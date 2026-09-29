@@ -1,5 +1,5 @@
 import { LoadingIcon } from '../shared/LoadingIcon';
-import { IFaucetConfig, LOCAL_CLAIM_INTERVAL_SECONDS } from '../../common/FaucetConfig';
+import { IFaucetConfig } from '../../common/FaucetConfig';
 import { FaucetConfigContext, FaucetPageContext } from '../FaucetPage';
 import React, { useContext } from 'react';
 import { useParams, useNavigate, NavigateFunction } from "react-router";
@@ -275,7 +275,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
             <span>Testnet {this.props.faucetConfig.faucetCoinSymbol}</span>
           </div>
           <div className="qms-card__details" aria-hidden="true">
-            {['Wallet', 'Network', 'Next request available'].map(label => <div key={label}><span>{label}</span><span className="qms-review-skeleton qms-review-skeleton--value" /></div>)}
+            {['Wallet', 'Network'].map(label => <div key={label}><span>{label}</span><span className="qms-review-skeleton qms-review-skeleton--value" /></div>)}
           </div>
           <div className="qms-review-skeleton qms-review-skeleton--button" aria-hidden="true" />
         </div>
@@ -300,10 +300,6 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
     let explorerTemplate = this.props.faucetConfig.network ? this.props.faucetConfig.network.explorerUrl + '/tx/{txid}' : this.props.faucetConfig.ethTxExplorerLink;
     let explorer = status.claimHash && explorerTemplate?.replace('{txid}', status.claimHash);
     let shorten = (value: string) => value ? value.slice(0, 8) + '…' + value.slice(-6) : '—';
-    let nextRequestDate = finished && this.state.lastSuccessfulClaim > 0
-      ? new Date((this.state.lastSuccessfulClaim + LOCAL_CLAIM_INTERVAL_SECONDS) * 1000)
-      : new Date(Date.now() + LOCAL_CLAIM_INTERVAL_SECONDS * 1000);
-    let remaining = Math.max(0, Math.floor((nextRequestDate.getTime() - Date.now()) / 1000));
     return (
       <div className="qms-claim__content">
         <div className="qms-card__top">
@@ -330,7 +326,6 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
             </svg>
           </button></span></div>
           {finished ? <div><span>Transaction</span>{explorer ? <a href={explorer} target="_blank" rel="noopener noreferrer" title={status.claimHash}>{shorten(status.claimHash)}<img src={images + '/qms-external.svg'} alt="" width="12" height="12" /></a> : <span title={status.claimHash}>{shorten(status.claimHash)}</span>}</div> : <div className="qms-card__text-row"><span>Network</span><span>{this.props.faucetConfig.network?.chainName || 'Testnet'}{this.props.faucetConfig.chainId ? <span className="qms-card__muted"> · {this.props.faucetConfig.chainId}</span> : null}</span></div>}
-          <div className="qms-card__text-row"><span>Next request available</span><span>{remaining > 0 ? <>{nextRequestDate.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })} <span className="qms-card__muted">· in {Math.ceil(remaining / 3600)}h</span></> : 'Now'}</span></div>
         </div>
         {status.status === 'claimable' ? this.renderClaimForm() : null}
         {status.status === 'failed' ? this.renderSessionFailed() : null}
