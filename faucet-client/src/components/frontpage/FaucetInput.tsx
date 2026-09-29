@@ -59,8 +59,6 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
     let panels = getPanels("mining").filter((panel) => panel.modes && panel.modes.length > 0);
     let hasMining = !!this.props.faucetConfig.modules.pow;
     let playing = !!this.state.startModule;
-    let invalidAddress = !playing && !hasMining &&
-      (!/^0x[0-9a-fA-F]{40}$/.test(this.state.targetAddr) || /^0x0{40}$/i.test(this.state.targetAddr));
 
     let submitBtnCaption: string;
     // "does this session still mine" is the core's own question, and the mode the
@@ -138,13 +136,13 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
           <button 
             className="btn btn-success start-action" 
             onClick={(evt) => this.onSubmitBtnClick()} 
-            disabled={this.state.submitting || invalidAddress}>
+            disabled={this.state.submitting}>
               {this.state.submitting ?
               <span className='inline-spinner'>
                 <LoadingIcon />
               </span>
               : null}
-              {invalidAddress ? 'Please enter a valid EVM address' : !playing && !hasMining ? 'Review' : submitBtnCaption}
+              {submitBtnCaption}
           </button>
         </div>
         <p className="qms-card__limit">LIMIT: 4 REQUESTS / 24H</p>
@@ -270,8 +268,14 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
 
   private async onSubmitBtnClick(claimData?: any) {
     if(!this.props.faucetConfig.modules.pow && !this.state.startModule && !this.state.reviewing) {
-      if(!/^0x[0-9a-fA-F]{40}$/.test(this.state.targetAddr) || /^0x0{40}$/i.test(this.state.targetAddr))
+      if(!this.state.targetAddr.trim()) {
+        this.props.faucetContext.showNotification("warning", "Please enter your wallet address");
         return;
+      }
+      if(!/^0x[0-9a-fA-F]{40}$/.test(this.state.targetAddr) || /^0x0{40}$/i.test(this.state.targetAddr)) {
+        this.props.faucetContext.showNotification("warning", "Please enter a valid EVM address");
+        return;
+      }
       this.setState({ reviewing: true, addressCopied: false });
       return;
     }
