@@ -2,6 +2,7 @@ import React, { ReactElement } from 'react';
 import { MemoryRouter as Router, Routes, Route, Link, useLocation } from "react-router";
 
 import { FaucetApi } from '../common/FaucetApi';
+import { getNetworkLabel } from '../common/RuntimeConfig';
 import { IFaucetConfig, IFaucetStatus } from '../common/FaucetConfig';
 import { IFaucetContext, IFaucetContextUrls } from '../common/FaucetContext';
 import { FaucetNotification } from './shared/FaucetNotification';
@@ -222,7 +223,7 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
               <div className="qms-brand" aria-label="QMS Faucet">
                 <img src={(this.pageContext.faucetUrls.imagesUrl || "/images") + "/qms-mark.svg"} alt="" width="26" height="26" />
                 <strong>QMS</strong>
-                <span>Testnet Faucet</span>
+                <span>{getNetworkLabel(this.state.faucetConfig.network)} Faucet</span>
               </div>
               <div className="qms-header__links">
                 <a className="qms-header__docs" href="https://docs.qms.finance/" target="_blank" rel="noopener noreferrer">DOCS</a>
