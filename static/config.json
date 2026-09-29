@@ -1,3 +1,5 @@
 {
-  "network": "devnet"
+  "network": "devnet",
+  "requestAmount": 4,
+  "requestCircle": 24
 }

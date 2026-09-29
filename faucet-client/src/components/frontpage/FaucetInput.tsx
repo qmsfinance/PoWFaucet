@@ -148,7 +148,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
               {submitBtnCaption}
           </button>
         </div>
-        <p className="qms-card__limit">LIMIT: 4 REQUESTS / 24H</p>
+        <p className="qms-card__limit">LIMIT: {this.props.faucetConfig.requestAmount ?? 4} REQUESTS / {this.props.faucetConfig.requestCircle ?? 24}H</p>
       </div>
       {this.state.reviewing ? this.renderReview(submitBtnCaption) : null}
       </>
