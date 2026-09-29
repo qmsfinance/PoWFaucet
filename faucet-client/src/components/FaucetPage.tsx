@@ -310,7 +310,7 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
                 <span>© {new Date().getFullYear()} QMS Network</span>
                 <a className="qms-footer__help" href="https://docs.qms.finance/" target="_blank" rel="noopener noreferrer">Need help?</a>
               </div>
-              <a className="qms-footer__credit" href="https://github.com/pk910/PoWFaucet" target="_blank" rel="noopener noreferrer">Powered by PoWFaucet</a>
+              <a className="qms-footer__credit" href="https://github.com/qmsfinance/PoWFaucet" target="_blank" rel="noopener noreferrer">Powered by PoWFaucet · Source (AGPL-3.0)</a>
             </footer>
           </FaucetPageContext.Provider>
         </FaucetConfigContext.Provider>
