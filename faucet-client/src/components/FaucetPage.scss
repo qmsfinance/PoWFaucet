@@ -125,13 +125,27 @@ html.powfaucet, html.powfaucet body {
   align-items: center;
   color: #6a6a88;
   display: flex;
+  flex-wrap: wrap;
   font-family: "DM Mono", ui-monospace, monospace;
   font-size: 11px;
   gap: 24px;
-  justify-content: center;
+  justify-content: space-between;
   letter-spacing: .12em;
   padding: 20px;
   text-transform: uppercase;
+}
+
+.qms-footer__left {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.qms-footer__credit {
+  color: #8b8ba8;
+  margin-left: auto;
+  text-transform: none;
 }
 
 
