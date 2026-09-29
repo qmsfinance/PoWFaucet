@@ -83,3 +83,11 @@ This faucet contains parts of code from the following projects:
 # License
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+
+## Frontend runtime configuration
+
+Docker startup accepts `FAUCET_NETWORK` (`devnet`, `stagenet` or `testnet`),
+`REQUEST_AMOUNT` (requests per period, default `4`), and `REQUEST_CIRCLE`
+(period in hours, default `24`). Request values must be positive integers.
+These update `/config.json` without rebuilding the frontend and control the
+displayed limits; configure backend rate limits separately.
