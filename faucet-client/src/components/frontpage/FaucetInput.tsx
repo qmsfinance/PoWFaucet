@@ -9,16 +9,19 @@ import { AuthenticatoorLogin } from './authenticatoor/AuthenticatoorLogin';
 import { GithubLogin } from './github/GithubLogin';
 import { ZupassLogin } from './zupass/ZupassLogin';
 import VoucherInput, { IVoucherInputRef } from './voucher/VoucherInput';
+import { ClaimInput } from '../claim/ClaimInput';
 import { toReadableAmount } from '../../utils/ConvertHelpers';
 
 export interface IFaucetInputProps {
   faucetContext: IFaucetContext;
   faucetConfig: IFaucetConfig
-  submitInputs(inputs: any): Promise<void>;
+  submitInputs(inputs: any, claimData?: any): Promise<void>;
 }
 
 export interface IFaucetInputState {
   submitting: boolean;
+  reviewing: boolean;
+  addressCopied: boolean;
   targetAddr: string;
   /** the module a session would be started with, "" = mine only */
   /** the module a session would be started with, "" for mining alone */
@@ -39,6 +42,8 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
 
     this.state = {
       submitting: false,
+      reviewing: false,
+      addressCopied: false,
       targetAddr: "",
       startModule: "",
       startMode: "",
@@ -54,7 +59,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
     let panels = getPanels("mining").filter((panel) => panel.modes && panel.modes.length > 0);
     let hasMining = !!this.props.faucetConfig.modules.pow;
     let playing = !!this.state.startModule;
-    let invalidAddress = !playing && !hasMining && this.state.targetAddr.length > 0 &&
+    let invalidAddress = !playing && !hasMining &&
       (!/^0x[0-9a-fA-F]{40}$/.test(this.state.targetAddr) || /^0x0{40}$/i.test(this.state.targetAddr));
 
     let submitBtnCaption: string;
@@ -74,12 +79,10 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
     else {
       submitBtnCaption = "Send " + toReadableAmount(this.props.faucetConfig.maxClaim, this.props.faucetConfig.faucetCoinDecimals) + " " + getNetworkLabel(this.props.faucetConfig.network) + " " + this.props.faucetConfig.faucetCoinSymbol;
     }
-    if(invalidAddress) {
-      submitBtnCaption = "Please enter a valid EVM address";
-    }
 
     return (
-      <div className="faucet-inputs qms-faucet-inputs">
+      <>
+      <div className="faucet-inputs qms-faucet-inputs" style={this.state.reviewing ? { display: 'none' } : undefined}>
         <label className="qms-faucet-inputs__label" htmlFor="faucet-wallet-address">Wallet address</label>
         <div className="qms-faucet-inputs__wallet">
           <input
@@ -124,7 +127,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
           />
         : null}
         {panels.length > 0 ? this.renderStartModes(panels, hasMining) : null}
-        {requestCaptcha ? 
+        {requestCaptcha && (playing || hasMining) ?
           <FaucetCaptcha
             faucetConfig={this.props.faucetConfig}
             ref={this.faucetCaptcha}
@@ -141,13 +144,55 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
                 <LoadingIcon />
               </span>
               : null}
-              {submitBtnCaption}
+              {invalidAddress ? 'Please enter a valid EVM address' : !playing && !hasMining ? 'Review' : submitBtnCaption}
           </button>
         </div>
         <p className="qms-card__limit">LIMIT: 4 REQUESTS / 24H</p>
       </div>
+      {this.state.reviewing ? this.renderReview(submitBtnCaption) : null}
+      </>
     );
 	}
+
+  private renderReview(caption: string): React.ReactElement {
+    let amount = toReadableAmount(this.props.faucetConfig.maxClaim, this.props.faucetConfig.faucetCoinDecimals);
+    let address = this.state.targetAddr;
+    let images = this.props.faucetContext.faucetUrls.imagesUrl || '/images';
+    return (
+      <div className="qms-claim__content">
+        <div className="qms-card__top">
+          <button className="qms-card__back" onClick={() => this.setState({ reviewing: false })} disabled={this.state.submitting}><img src={images + '/qms-chevron.svg'} alt="" width="12" height="12" />CHANGE ADDRESS</button>
+          <span>STEP 2 OF 3</span>
+        </div>
+        <div className="qms-card__amount"><p>YOU’RE CLAIMING</p><strong>{amount}</strong><span>{getNetworkLabel(this.props.faucetConfig.network)} {this.props.faucetConfig.faucetCoinSymbol}</span></div>
+        <div className="qms-card__details">
+          <div><span>Wallet</span><span className="qms-card__wallet"><span title={address}>{address ? address.slice(0, 8) + '…' + address.slice(-6) : '—'}</span><button aria-label={this.state.addressCopied ? 'Wallet address copied' : 'Copy wallet address'} onClick={() => this.copyAddress()}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              {this.state.addressCopied ? <><rect width="18" height="18" x="3" y="3" rx="2" /><path d="m16 9-5.5 5.5L8 12" /></> : <><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></>}
+            </svg>
+          </button></span></div>
+          <div><span>Network</span><span>{this.props.faucetConfig.network?.chainName || 'Testnet'}{this.props.faucetConfig.chainId ? <span className="qms-card__muted"> · {this.props.faucetConfig.chainId}</span> : null}</span></div>
+        </div>
+        {this.props.faucetConfig.modules.captcha?.requiredForStart ?
+          <FaucetCaptcha
+            faucetConfig={this.props.faucetConfig}
+            ref={this.faucetCaptcha}
+            variant='session'
+          />
+        : null}
+        <ClaimInput faucetConfig={this.props.faucetConfig} caption={caption} submitInputs={(claimData) => this.onSubmitBtnClick(claimData)} />
+      </div>
+    );
+  }
+
+  private async copyAddress(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(this.state.targetAddr);
+      this.setState({ addressCopied: true });
+    } catch {
+      this.setState({ addressCopied: false });
+    }
+  }
 
   /** the mode the player has chosen, or null when they are mining alone */
   private pickedMode(panels: IRegisteredPanel[]) {
@@ -223,7 +268,17 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
     );
   }
 
-  private async onSubmitBtnClick() {
+  private async onSubmitBtnClick(claimData?: any) {
+    if(!this.props.faucetConfig.modules.pow && !this.state.startModule && !this.state.reviewing) {
+      if(!/^0x[0-9a-fA-F]{40}$/.test(this.state.targetAddr) || /^0x0{40}$/i.test(this.state.targetAddr))
+        return;
+      this.setState({ reviewing: true, addressCopied: false });
+      return;
+    }
+    if(this.state.reviewing && this.props.faucetConfig.modules.captcha?.requiredForClaim && !claimData?.captchaToken) {
+      this.props.faucetContext.showNotification("warning", "Complete the claim captcha before sending. It may have expired.");
+      return;
+    }
     this.setState({
       submitting: true
     });
@@ -234,6 +289,11 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
       inputData.addr = this.state.targetAddr;
       if(this.props.faucetConfig.modules.captcha?.requiredForStart) {
         inputData.captchaToken = await this.faucetCaptcha.current?.getToken();
+        if(this.state.reviewing && !inputData.captchaToken) {
+          this.faucetCaptcha.current?.resetToken();
+          this.props.faucetContext.showNotification("warning", "Complete the captcha before sending. It may have expired.");
+          return;
+        }
       }
       if(this.props.faucetConfig.modules.authenticatoor) {
         inputData.authToken = this.authenticatoorLogin.current?.getToken() || undefined;
@@ -255,7 +315,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
         inputData.params = { mode: this.state.startMode };
       }
 
-      await this.props.submitInputs(inputData);
+      await this.props.submitInputs(inputData, claimData);
     } catch(ex) {
       if(this.faucetCaptcha.current)
         this.faucetCaptcha.current.resetToken();
