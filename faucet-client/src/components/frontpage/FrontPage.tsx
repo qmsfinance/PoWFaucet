@@ -19,6 +19,7 @@ export interface IFrontPageProps {
 
 export class FrontPage extends React.PureComponent<IFrontPageProps> {
   private faucetInput = React.createRef<FaucetInput>();
+  private pendingClaimSessionId: string | undefined;
 
 	public render(): React.ReactElement<IFrontPageProps> {
     return (
@@ -29,14 +30,14 @@ export class FrontPage extends React.PureComponent<IFrontPageProps> {
           ref={this.faucetInput} 
           faucetContext={this.props.faucetContext} 
           faucetConfig={this.props.faucetConfig} 
-          submitInputs={(inputData) => this.onSubmitInputs(inputData)}/>
+          submitInputs={(inputData, claimData) => this.onSubmitInputs(inputData, claimData)}/>
           </div>
         <SlotOutlet slot="front.after" faucetConfig={this.props.faucetConfig} navigate={(path) => this.props.navigateFn(path)} />
       </QmsLayout>
     );
 	}
 
-  private async onSubmitInputs(inputData: any): Promise<void> {
+  private async onSubmitInputs(inputData: any, claimData?: any): Promise<void> {
     try {
       if(!this.props.faucetConfig.modules.pow && !inputData.module) {
         let activeSession = this.props.faucetContext.activeSession;
@@ -46,8 +47,18 @@ export class FrontPage extends React.PureComponent<IFrontPageProps> {
         } : FaucetSession.recoverSessionInfo();
         if(recoveryInfo?.addr && recoveryInfo.addr.toLowerCase() === inputData.addr?.toLowerCase()) {
           let sessionStatus = await this.props.faucetContext.faucetApi.getSessionStatus(recoveryInfo.id);
+          let pendingClaim = this.pendingClaimSessionId === sessionStatus.session || FaucetSession.recoverSessionInfo()?.id === sessionStatus.session;
+          if(sessionStatus.target.toLowerCase() === inputData.addr.toLowerCase() &&
+            (sessionStatus.status === "claiming" || (sessionStatus.status === "finished" && pendingClaim))) {
+            this.props.faucetContext.activeSession = new FaucetSession(this.props.faucetContext, sessionStatus.session, sessionStatus);
+            this.pendingClaimSessionId = undefined;
+            FaucetSession.persistSessionInfo(null);
+            this.props.navigateFn("/claim/" + sessionStatus.session);
+            return;
+          }
           if(sessionStatus.status === "claimable" && sessionStatus.target.toLowerCase() === inputData.addr.toLowerCase()) {
             this.props.faucetContext.activeSession = new FaucetSession(this.props.faucetContext, sessionStatus.session, sessionStatus);
+            await this.submitReviewedClaim(sessionStatus.session, claimData);
             this.props.navigateFn("/claim/" + sessionStatus.session);
             return;
           }
@@ -135,6 +146,7 @@ export class FrontPage extends React.PureComponent<IFrontPageProps> {
       switch(sessionInfo.status) {
         case "claimable":
           FaucetSession.persistSessionInfo(session);
+          await this.submitReviewedClaim(sessionInfo.session, claimData);
           // redirect to claim page
           console.log("redirect to claim page!", session);
           this.props.navigateFn("/claim/" + sessionInfo.session);
@@ -164,6 +176,20 @@ export class FrontPage extends React.PureComponent<IFrontPageProps> {
       }
       throw ex;
     }
+  }
+
+  private async submitReviewedClaim(sessionId: string, claimData?: any): Promise<void> {
+    if(claimData === undefined)
+      return;
+    let input = Object.assign({ session: sessionId }, claimData);
+    await emitHook("session.claim", { sessionId, input });
+    this.pendingClaimSessionId = sessionId;
+    let status = await this.props.faucetContext.faucetApi.claimReward(input);
+    if(status.status === "failed")
+      throw (status.failedCode ? "[" + status.failedCode + "] " : "") + status.failedReason;
+    this.pendingClaimSessionId = undefined;
+    emitHookSafe("session.claimed", { sessionId, status });
+    FaucetSession.persistSessionInfo(null);
   }
 
 }
