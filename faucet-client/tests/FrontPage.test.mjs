@@ -84,8 +84,15 @@ test('different address starts and persists a new session', async () => {
   assert.equal(FaucetSession.recoverSessionInfo().id, 'new');
 });
 
-test('submitted, finished, failed, or missing sessions do not resume Review', async () => {
-  for(const status of ['claiming', 'finished', 'failed', undefined]) {
+test('a finished active session without recovery state starts a new request', async () => {
+  const { page, calls } = setup({ ...original, status: 'finished' });
+  await page.onSubmitInputs({ addr: address });
+  assert.equal(calls.started, 1);
+  assert.deepEqual(calls.navigated, ['/claim/new']);
+});
+
+test('failed or missing sessions do not resume Review', async () => {
+  for(const status of ['failed', undefined]) {
     const { page, calls } = setup({ ...original, status });
     await page.onSubmitInputs({ addr: address });
     assert.equal(calls.started, 1);
@@ -97,6 +104,50 @@ test('server target must match before resuming', async () => {
   const { page, calls } = setup({ ...original, target: '0x' + 'a'.repeat(40) });
   await page.onSubmitInputs({ addr: address });
   assert.equal(calls.started, 1);
+});
+
+test('a same-address claiming session opens its existing claim without starting or claiming again', async () => {
+  const { page, calls, faucetContext } = setup({ ...original, status: 'claiming' });
+  faucetContext.faucetApi.claimReward = async () => assert.fail('must not claim again');
+  await page.onSubmitInputs({ addr: address }, { captchaToken: 'unused' });
+  assert.equal(calls.started, 0);
+  assert.deepEqual(calls.navigated, ['/claim/original']);
+});
+
+test('a persisted finished session opens its existing claim', async () => {
+  const { page, calls } = setup({ ...original, status: 'finished' }, false);
+  await page.onSubmitInputs({ addr: address });
+  assert.equal(calls.started, 0);
+  assert.deepEqual(calls.navigated, ['/claim/original']);
+});
+
+test('a claiming session with a different target does not resume', async () => {
+  const { page, calls } = setup({ ...original, status: 'claiming', target: '0x' + 'a'.repeat(40) });
+  await page.onSubmitInputs({ addr: address });
+  assert.equal(calls.started, 1);
+  assert.deepEqual(calls.navigated, ['/claim/new']);
+});
+
+test('a lost claim response retries by opening the existing claiming or finished session', async () => {
+  for(const status of ['claiming', 'finished']) {
+    const { page, calls, faucetContext } = setup();
+    const target = '0x' + 'a'.repeat(40);
+    faucetContext.faucetApi.getSessionStatus = async id => {
+      calls.checked++;
+      assert.equal(id, 'new');
+      return { ...original, session: 'new', target, status };
+    };
+    let claims = 0;
+    faucetContext.faucetApi.claimReward = async () => {
+      claims++;
+      throw new Error('Lost response');
+    };
+    await assert.rejects(page.onSubmitInputs({ addr: target }, { captchaToken: 'claim-token' }), /Lost response/);
+    await page.onSubmitInputs({ addr: target }, { captchaToken: 'claim-token' });
+    assert.equal(calls.started, 1);
+    assert.equal(claims, 1);
+    assert.deepEqual(calls.navigated, ['/claim/new']);
+  }
 });
 
 test('recurring-limit failures still surface for a completed session', async () => {
@@ -112,4 +163,127 @@ test('a failed status lookup does not create a duplicate session', async () => {
   faucetContext.faucetApi.getSessionStatus = async () => { throw new Error('Network unavailable'); };
   await assert.rejects(page.onSubmitInputs({ addr: address }), /Network unavailable/);
   assert.equal(calls.started, 0);
+});
+
+const { FaucetInput } = await loadComponent('../src/components/frontpage/FaucetInput.tsx', {
+  default: require('react'), getPanels: () => [], getNetworkLabel: () => 'Devnet', toReadableAmount: () => '10',
+});
+
+function setupInput() {
+  const calls = [];
+  const input = new FaucetInput({
+    faucetContext: { faucetUrls: {}, showNotification() {} },
+    faucetConfig: { modules: { captcha: { requiredForStart: true } } },
+    submitInputs: async (...args) => calls.push(args),
+  });
+  input.setState = update => Object.assign(input.state, update);
+  return { input, calls };
+}
+
+test('a valid first click opens local Review without submitting or retrieving captcha', async () => {
+  const { input, calls } = setupInput();
+  input.state.targetAddr = address;
+  input.faucetCaptcha.current = { getToken() { throw new Error('Must not check captcha'); } };
+  await input.onSubmitBtnClick();
+  assert.equal(input.state.reviewing, true);
+  assert.equal(calls.length, 0);
+});
+
+test('Review accepts a custom captcha token without an onChange callback', async () => {
+  const { input, calls } = setupInput();
+  input.state.targetAddr = address;
+  await input.onSubmitBtnClick();
+  input.faucetCaptcha.current = { async getToken() { return 'custom-start-token'; }, resetToken() {} };
+  await input.onSubmitBtnClick({ captchaToken: 'claim-token' });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0].captchaToken, 'custom-start-token');
+  assert.equal(calls[0][0].addr, address);
+  assert.equal(calls[0][1].captchaToken, 'claim-token');
+});
+
+test('Review Send starts then claims, and navigates only after claiming', async () => {
+  const { page, calls, faucetContext } = setup();
+  faucetContext.faucetApi.claimReward = async input => {
+    assert.equal(input.session, 'new');
+    assert.equal(input.captchaToken, 'claim-token');
+    assert.equal(calls.started, 1);
+    assert.equal(calls.navigated.length, 0);
+    return { ...original, status: 'claiming' };
+  };
+  await page.onSubmitInputs({ addr: '0x' + 'a'.repeat(40), captchaToken: 'start-token' }, { captchaToken: 'claim-token' });
+  assert.deepEqual(calls.navigated, ['/claim/new']);
+  assert.equal(FaucetSession.recoverSessionInfo(), null);
+});
+
+test('Review Send resumes and claims an existing session', async () => {
+  const { page, calls, faucetContext } = setup();
+  let claimed = false;
+  faucetContext.faucetApi.claimReward = async input => {
+    assert.equal(input.session, 'original');
+    claimed = true;
+    return { ...original, status: 'claiming' };
+  };
+  await page.onSubmitInputs({ addr: address }, {});
+  assert.equal(calls.started, 0);
+  assert.equal(claimed, true);
+});
+
+test('failed Review claim retains session for retry and does not navigate', async () => {
+  const { page, calls, faucetContext } = setup();
+  faucetContext.faucetApi.claimReward = async () => { throw new Error('Network unavailable'); };
+  await assert.rejects(page.onSubmitInputs({ addr: '0x' + 'a'.repeat(40) }, {}), /Network unavailable/);
+  assert.equal(FaucetSession.recoverSessionInfo().id, 'new');
+  assert.equal(calls.navigated.length, 0);
+});
+
+test('direct first step renders no captcha; Review renders the start captcha', () => {
+  const { input } = setupInput();
+  input.props.faucetConfig.maxClaim = 10n;
+  input.props.faucetConfig.faucetCoinDecimals = 0;
+  const form = input.render().props.children[0];
+  assert.equal(form.props.children.some(child => child?.props?.variant === 'session'), false);
+  input.state.reviewing = true;
+  const review = input.renderReview('Send');
+  assert.equal(review.props.children[3].props.variant, 'session');
+});
+
+test('an expired authoritative captcha stays in Review and sends no request', async () => {
+  const { input, calls } = setupInput();
+  input.state.reviewing = true;
+  input.state.targetAddr = address;
+  let resets = 0;
+  input.faucetCaptcha.current = { async getToken() { return null; }, resetToken() { resets++; } };
+  await input.onSubmitBtnClick({});
+  assert.equal(calls.length, 0);
+  assert.equal(resets, 1);
+  assert.equal(input.state.reviewing, true);
+  assert.equal(input.state.targetAddr, address);
+});
+
+test('submission errors reset captcha without leaving Review or losing address', async () => {
+  const { input } = setupInput();
+  input.state.reviewing = true;
+  input.state.targetAddr = address;
+  input.faucetCaptcha.current = { async getToken() { return 'token'; }, resetToken() {} };
+  input.props.submitInputs = async () => { throw new Error('Expired captcha'); };
+  await assert.rejects(input.onSubmitBtnClick({}), /Expired captcha/);
+  assert.equal(input.state.reviewing, true);
+  assert.equal(input.state.targetAddr, address);
+  assert.equal(input.state.submitting, false);
+});
+
+test('first-step frontend validation blocks blank, whitespace, malformed, and zero addresses', async () => {
+  const { input, calls } = setupInput();
+  for(const value of ['', '   ', 'invalid address', '0x1234', '0x' + '0'.repeat(40), address]) {
+    input.state.targetAddr = value;
+    const form = input.render().props.children[0];
+    const actions = form.props.children.find(child => child?.props?.className === 'faucet-actions center');
+    const button = actions.props.children;
+    assert.equal(button.props.disabled, value !== address);
+    assert.equal(button.props.children[1], value === address ? 'Review' : 'Please enter a valid EVM address');
+    await input.onSubmitBtnClick();
+    assert.equal(input.state.reviewing, value === address);
+    input.state.reviewing = false;
+  }
+  assert.equal(calls.length, 0);
 });
