@@ -1,4 +1,12 @@
 # PoWFaucet
+
+> **QMS modified version.** This repository is a modified version of
+> [pk910/PoWFaucet](https://github.com/pk910/PoWFaucet), maintained by QMS since
+> 2026-09-28. Changes: the UI (`faucet-client/`, `static/`), its runtime network preset
+> (see *Frontend runtime configuration* below), and the image pipeline
+> (`.github/workflows/qms-faucet-image.yml`). The server and its modules are upstream's.
+> It is the source of the faucets QMS runs, offered to their users under AGPL-3.0 §13.
+
 <img src="https://faucets.pk910.de/images/logo-cat-small.png" height="90px" />
 
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/pk910/PoWFaucet?label=Latest%20Release)](https://github.com/pk910/PoWFaucet/releases/latest)
@@ -83,6 +91,10 @@ This faucet contains parts of code from the following projects:
 # License
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+
+Both the upstream work and the QMS modifications are licensed under the GNU Affero General
+Public License v3.0, the text in [LICENSE](LICENSE). Copyright in the upstream work stays
+with its authors.
 
 ## Frontend runtime configuration
 
