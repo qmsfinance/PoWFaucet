@@ -3,11 +3,11 @@ set -e
 
 if [ -n "$FAUCET_NETWORK" ]; then
   case "$FAUCET_NETWORK" in
-    devnet|stagenet)
+    devnet|stagenet|testnet)
       printf '{"network":"%s"}\n' "$FAUCET_NETWORK" > /app/static/config.json
       ;;
     *)
-      echo "Unsupported FAUCET_NETWORK: $FAUCET_NETWORK (expected devnet or stagenet)" >&2
+      echo "Unsupported FAUCET_NETWORK: $FAUCET_NETWORK (expected devnet, stagenet or testnet)" >&2
       exit 1
       ;;
   esac

@@ -27,6 +27,20 @@ export const NETWORKS = {
     nativeCurrencyDecimals: '18',
     testnet: true,
   },
+  testnet: {
+    networkId: 'testnet',
+    identity: 'net3',
+    chainId: '19480',
+    rpcUrl: 'https://rpc.net3.test-qms.com',
+    chainName: 'QMS Testnet',
+    explorerUrl: 'https://explorer.net3.test-qms.com',
+    explorerName: 'QMS Explorer',
+    dexApiUrl: 'https://dex-api.net3.test-qms.com',
+    nativeCurrencyName: 'QMS',
+    nativeCurrencySymbol: 'QMS',
+    nativeCurrencyDecimals: '18',
+    testnet: true,
+  },
 } as const;
 
 export type DeployedNetwork = typeof NETWORKS[keyof typeof NETWORKS];
