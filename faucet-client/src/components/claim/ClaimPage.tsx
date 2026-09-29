@@ -322,7 +322,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
         <div className="qms-card__details">
           {submitted ? <div><span>Amount</span><span>{amount} {getNetworkLabel(this.props.faucetConfig.network)} {this.props.faucetConfig.faucetCoinSymbol}</span></div> : null}
           <div><span>Wallet</span><span className="qms-card__wallet"><span title={status.target}>{shorten(status.target)}</span><button aria-label={this.state.addressCopied ? 'Wallet address copied' : 'Copy wallet address'} onClick={() => this.copyAddress()}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               {this.state.addressCopied ? <><rect width="18" height="18" x="3" y="3" rx="2" /><path d="m16 9-5.5 5.5L8 12" /></> : <><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></>}
             </svg>
           </button></span></div>
