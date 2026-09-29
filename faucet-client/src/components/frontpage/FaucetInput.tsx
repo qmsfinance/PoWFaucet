@@ -1,3 +1,4 @@
+import { getNetworkLabel } from '../../common/RuntimeConfig';
 import { LoadingIcon } from '../shared/LoadingIcon';
 import React from 'react';
 import { IFaucetConfig } from '../../common/FaucetConfig';
@@ -71,7 +72,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
       submitBtnCaption = "Start Mining";
     }
     else {
-      submitBtnCaption = "Send " + toReadableAmount(this.props.faucetConfig.maxClaim, this.props.faucetConfig.faucetCoinDecimals) + " Testnet " + this.props.faucetConfig.faucetCoinSymbol;
+      submitBtnCaption = "Send " + toReadableAmount(this.props.faucetConfig.maxClaim, this.props.faucetConfig.faucetCoinDecimals) + " " + getNetworkLabel(this.props.faucetConfig.network) + " " + this.props.faucetConfig.faucetCoinSymbol;
     }
     if(invalidAddress) {
       submitBtnCaption = "Please enter a valid EVM address";

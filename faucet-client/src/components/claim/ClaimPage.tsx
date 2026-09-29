@@ -1,3 +1,4 @@
+import { getNetworkLabel } from '../../common/RuntimeConfig';
 import { LoadingIcon } from '../shared/LoadingIcon';
 import { IFaucetConfig } from '../../common/FaucetConfig';
 import { FaucetConfigContext, FaucetPageContext } from '../FaucetPage';
@@ -272,7 +273,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
           <div className="qms-card__amount" aria-hidden="true">
             <p>YOU’RE CLAIMING</p>
             <span className="qms-review-skeleton qms-review-skeleton--amount" />
-            <span>Testnet {this.props.faucetConfig.faucetCoinSymbol}</span>
+            <span>{getNetworkLabel(this.props.faucetConfig.network)} {this.props.faucetConfig.faucetCoinSymbol}</span>
           </div>
           <div className="qms-card__details" aria-hidden="true">
             {['Wallet', 'Network'].map(label => <div key={label}><span>{label}</span><span className="qms-review-skeleton qms-review-skeleton--value" /></div>)}
@@ -309,9 +310,9 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
         </div>
         {submitted ? <div className="qms-card__result">
           {finished ? <div className="qms-card__success"><img src={images + '/qms-check.svg'} alt="" width="24" height="24" /></div> : null}
-          <h2>{amount} Testnet {this.props.faucetConfig.faucetCoinSymbol} {finished ? 'sent' : sending ? 'sending' : 'queued'}</h2>
+          <h2>{amount} {getNetworkLabel(this.props.faucetConfig.network)} {this.props.faucetConfig.faucetCoinSymbol} {finished ? 'sent' : sending ? 'sending' : 'queued'}</h2>
           <p>{finished ? 'The tokens are now in your wallet.' : sending ? 'Your transaction is awaiting confirmation.' : 'Your request is waiting to be sent.'}</p>
-        </div> : <div className="qms-card__amount"><p>YOU’RE CLAIMING</p><strong>{amount}</strong><span>Testnet {this.props.faucetConfig.faucetCoinSymbol}</span></div>}
+        </div> : <div className="qms-card__amount"><p>YOU’RE CLAIMING</p><strong>{amount}</strong><span>{getNetworkLabel(this.props.faucetConfig.network)} {this.props.faucetConfig.faucetCoinSymbol}</span></div>}
         {submitted ? <div className="qms-card__progress" aria-label={'Transaction ' + claimSteps[claimStep].toLowerCase()} aria-live="polite">
           {claimSteps.map((step, index) => <div key={step} className={finished || index < claimStep ? 'is-complete' : index === claimStep ? 'is-active' : 'is-pending'} aria-current={!finished && index === claimStep ? 'step' : undefined}>
             <span>{finished || index < claimStep ? <img src={images + '/qms-check-small.svg'} alt="Completed" width="12" height="12" /> : index === claimStep ?
@@ -319,7 +320,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
           </div>)}
         </div> : null}
         <div className="qms-card__details">
-          {submitted ? <div><span>Amount</span><span>{amount} Testnet {this.props.faucetConfig.faucetCoinSymbol}</span></div> : null}
+          {submitted ? <div><span>Amount</span><span>{amount} {getNetworkLabel(this.props.faucetConfig.network)} {this.props.faucetConfig.faucetCoinSymbol}</span></div> : null}
           <div><span>Wallet</span><span className="qms-card__wallet"><span title={status.target}>{shorten(status.target)}</span><button aria-label={this.state.addressCopied ? 'Wallet address copied' : 'Copy wallet address'} onClick={() => this.copyAddress()}>
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               {this.state.addressCopied ? <><rect width="18" height="18" x="3" y="3" rx="2" /><path d="m16 9-5.5 5.5L8 12" /></> : <><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></>}
@@ -353,7 +354,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
     return (
       <ClaimInput 
         faucetConfig={this.props.faucetConfig}
-        caption={'Send ' + toReadableAmount(BigInt(this.state.sessionStatus.balance), this.props.faucetConfig.faucetCoinDecimals) + ' Testnet ' + this.props.faucetConfig.faucetCoinSymbol}
+        caption={'Send ' + toReadableAmount(BigInt(this.state.sessionStatus.balance), this.props.faucetConfig.faucetCoinDecimals) + ' ' + getNetworkLabel(this.props.faucetConfig.network) + ' ' + this.props.faucetConfig.faucetCoinSymbol}
         submitInputs={(claimData) => this.submitClaim(claimData)}
       />
     );

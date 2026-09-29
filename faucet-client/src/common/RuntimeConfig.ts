@@ -31,6 +31,10 @@ export const NETWORKS = {
 
 export type DeployedNetwork = typeof NETWORKS[keyof typeof NETWORKS];
 
+export function getNetworkLabel(network?: DeployedNetwork): string {
+  return network ? network.networkId.charAt(0).toUpperCase() + network.networkId.slice(1) : 'Testnet';
+}
+
 export async function loadRuntimeConfig(): Promise<{ network?: DeployedNetwork; chainId?: string }>
 {
   let response = await fetch('/config.json', { cache: 'no-store' });
