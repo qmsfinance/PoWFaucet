@@ -37,6 +37,8 @@
 .qms-faucet-inputs__paste { height: 44px; padding: 0 14px; border: 0; border-radius: 8px; background: #1c1d30; color: #c0c0d8; font-family: "DM Mono", monospace; font-size: 11px; letter-spacing: 1.54px; text-transform: uppercase; }
 .faucet-page .qms-flow .faucet-actions { margin: 0; }
 .faucet-page .qms-flow .qms-card .faucet-actions button.start-action { height: 52px; padding: 0 16px; background: #b0c4f0; color: #070812; border-radius: 10px; font-size: 16px; font-weight: 700; }
+.qms-card__error { padding: 12px 16px; border: 1px solid #83404c; border-radius: 10px; background: #2b1821; color: #ffb4c0; font-size: 14px; line-height: 21px; overflow-wrap: anywhere; }
+.qms-card__error a { color: inherit; }
 .qms-card__limit { padding-top: 14px; border-top: 1px solid #1c1d30; color: #6a6a88; text-align: center; }
 .qms-claim__content { display: flex; flex-direction: column; gap: 20px; }
 .qms-card__top { display: flex; align-items: center; justify-content: space-between; color: #6a6a88; }

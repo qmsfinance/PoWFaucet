@@ -22,6 +22,7 @@ export interface IFaucetInputState {
   submitting: boolean;
   reviewing: boolean;
   addressCopied: boolean;
+  error: React.ReactNode;
   targetAddr: string;
   /** the module a session would be started with, "" = mine only */
   /** the module a session would be started with, "" for mining alone */
@@ -44,6 +45,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
       submitting: false,
       reviewing: false,
       addressCopied: false,
+      error: null,
       targetAddr: "",
       startModule: "",
       startMode: "",
@@ -88,7 +90,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
             className="form-control"
             value={this.state.targetAddr}
             placeholder={this.props.faucetConfig.modules.ensname?.required ? "name.eth" : "0x…"}
-            onChange={(evt) => this.setState({ targetAddr: evt.target.value })}
+            onChange={(evt) => this.setState({ targetAddr: evt.target.value, error: null })}
             autoComplete="off"
             spellCheck={false}
           />
@@ -132,6 +134,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
             variant='session'
           />
         : null}
+        {this.renderError()}
         <div className="faucet-actions center">
           <button 
             className="btn btn-success start-action" 
@@ -159,7 +162,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
     return (
       <div className="qms-claim__content">
         <div className="qms-card__top">
-          <button className="qms-card__back" onClick={() => this.setState({ reviewing: false })} disabled={this.state.submitting}><img src={images + '/qms-chevron.svg'} alt="" width="12" height="12" />CHANGE ADDRESS</button>
+          <button className="qms-card__back" onClick={() => this.setState({ reviewing: false, error: null })} disabled={this.state.submitting}><img src={images + '/qms-chevron.svg'} alt="" width="12" height="12" />CHANGE ADDRESS</button>
           <span>STEP 2 OF 3</span>
         </div>
         <div className="qms-card__amount"><p>YOU’RE CLAIMING</p><strong>{amount}</strong><span>{getNetworkLabel(this.props.faucetConfig.network)} {this.props.faucetConfig.faucetCoinSymbol}</span></div>
@@ -178,9 +181,14 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
             variant='session'
           />
         : null}
+        {this.renderError()}
         <ClaimInput faucetConfig={this.props.faucetConfig} caption={caption} submitInputs={(claimData) => this.onSubmitBtnClick(claimData)} />
       </div>
     );
+  }
+
+  private renderError(): React.ReactElement | null {
+    return this.state.error ? <div className="qms-card__error" role="alert">{this.state.error}</div> : null;
   }
 
   private async copyAddress(): Promise<void> {
@@ -269,22 +277,23 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
   private async onSubmitBtnClick(claimData?: any) {
     if(!this.props.faucetConfig.modules.pow && !this.state.startModule && !this.state.reviewing) {
       if(!this.state.targetAddr.trim()) {
-        this.props.faucetContext.showNotification("warning", "Please enter your wallet address");
+        this.setState({ error: "Please enter your wallet address" });
         return;
       }
       if(!/^0x[0-9a-fA-F]{40}$/.test(this.state.targetAddr) || /^0x0{40}$/i.test(this.state.targetAddr)) {
-        this.props.faucetContext.showNotification("warning", "Please enter a valid EVM address");
+        this.setState({ error: "Please enter a valid EVM address" });
         return;
       }
-      this.setState({ reviewing: true, addressCopied: false });
+      this.setState({ reviewing: true, addressCopied: false, error: null });
       return;
     }
     if(this.state.reviewing && this.props.faucetConfig.modules.captcha?.requiredForClaim && !claimData?.captchaToken) {
-      this.props.faucetContext.showNotification("warning", "Complete the claim captcha before sending. It may have expired.");
+      this.setState({ error: "Complete the claim captcha before sending. It may have expired." });
       return;
     }
     this.setState({
-      submitting: true
+      submitting: true,
+      error: null
     });
 
     try {
@@ -295,7 +304,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
         inputData.captchaToken = await this.faucetCaptcha.current?.getToken();
         if(this.state.reviewing && !inputData.captchaToken) {
           this.faucetCaptcha.current?.resetToken();
-          this.props.faucetContext.showNotification("warning", "Complete the captcha before sending. It may have expired.");
+          this.setState({ error: "Complete the captcha before sending. It may have expired." });
           return;
         }
       }
@@ -321,6 +330,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
 
       await this.props.submitInputs(inputData, claimData);
     } catch(ex) {
+      this.setState({ error: React.isValidElement(ex) ? ex : String(ex) });
       if(this.faucetCaptcha.current)
         this.faucetCaptcha.current.resetToken();
       throw ex;
@@ -334,9 +344,9 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
   private async onPasteAddress(): Promise<void> {
     try {
       let targetAddr = await navigator.clipboard.readText();
-      this.setState({ targetAddr: targetAddr.trim() });
+      this.setState({ targetAddr: targetAddr.trim(), error: null });
     } catch {
-      this.props.faucetContext.showNotification("warning", "Clipboard access was denied. Paste your wallet address manually.");
+      this.setState({ error: "Clipboard access was denied. Paste your wallet address manually." });
     }
   }
 

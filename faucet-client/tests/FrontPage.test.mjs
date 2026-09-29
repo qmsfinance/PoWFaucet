@@ -39,7 +39,7 @@ async function loadComponent(path, exports) {
 const { FaucetSession } = await loadComponent('../src/common/FaucetSession.ts', {});
 const { FrontPage } = await loadComponent('../src/components/frontpage/FrontPage.tsx', {
   default: require('react'), FaucetSession,
-  emitHook: async () => {}, emitHookSafe() {}, hasPlayableTask: () => false,
+  emitHook: async () => {}, emitHookSafe() {}, hasPlayableTask: () => false, PassportInfo: () => null,
 });
 const address = '0x1234567890abcdef1234567890abcdef12345678';
 const original = { session: 'original', status: 'claimable', target: address, start: 1, balance: '10', tasks: [] };
@@ -155,7 +155,7 @@ test('recurring-limit failures still surface for a completed session', async () 
   faucetContext.faucetApi.startSession = async () => ({ status: 'failed', failedCode: 'RECURRING_LIMIT', failedReason: 'Wait before claiming again' });
   await assert.rejects(page.onSubmitInputs({ addr: address }), error => String(error).includes('RECURRING_LIMIT'));
   assert.equal(calls.navigated.length, 0);
-  assert.equal(calls.dialogs.length, 1);
+  assert.equal(calls.dialogs.length, 0);
 });
 
 test('a failed status lookup does not create a duplicate session', async () => {
@@ -267,6 +267,9 @@ test('submission errors reset captcha without leaving Review or losing address',
   input.faucetCaptcha.current = { async getToken() { return 'token'; }, resetToken() {} };
   input.props.submitInputs = async () => { throw new Error('Expired captcha'); };
   await assert.rejects(input.onSubmitBtnClick({}), /Expired captcha/);
+  assert.equal(input.state.error, 'Error: Expired captcha');
+  const alert = input.renderReview('Send').props.children.find(child => child?.props?.role === 'alert');
+  assert.equal(alert.props.children, 'Error: Expired captcha');
   assert.equal(input.state.reviewing, true);
   assert.equal(input.state.targetAddr, address);
   assert.equal(input.state.submitting, false);
@@ -289,12 +292,61 @@ test('first-step frontend validation blocks blank, whitespace, malformed, and ze
     assert.equal(notifications.length, 0);
     await input.onSubmitBtnClick();
     assert.equal(input.state.reviewing, value === address);
-    assert.deepEqual(notifications, value === address ? [] : [{
-      level: 'warning',
-      message: value.trim() ? 'Please enter a valid EVM address' : 'Please enter your wallet address',
-    }]);
+    assert.deepEqual(notifications, []);
+    const message = value === address ? null : value.trim() ? 'Please enter a valid EVM address' : 'Please enter your wallet address';
+    assert.equal(input.state.error, message);
+    if(message) {
+      const alert = input.render().props.children[0].props.children.find(child => child?.props?.role === 'alert');
+      assert.equal(alert.props.children, message);
+    }
     notifications.length = 0;
     input.state.reviewing = false;
   }
   assert.equal(calls.length, 0);
+});
+
+
+test('editing the address clears its inline error', async () => {
+  const { input } = setupInput();
+  await input.onSubmitBtnClick();
+  const form = input.render().props.children[0];
+  form.props.children[1].props.children[0].props.onChange({ target: { value: address } });
+  assert.equal(input.state.error, null);
+  assert.equal(input.state.targetAddr, address);
+});
+
+test('Review captcha errors render inline without notifications', async () => {
+  const { input, calls } = setupInput();
+  input.props.faucetContext.showNotification = () => assert.fail('must not show a toast');
+  input.state.reviewing = true;
+  input.state.targetAddr = address;
+  input.props.faucetConfig.modules.captcha.requiredForClaim = true;
+  await input.onSubmitBtnClick({});
+  assert.equal(input.state.error, 'Complete the claim captcha before sending. It may have expired.');
+  input.props.faucetConfig.modules.captcha.requiredForClaim = false;
+  input.faucetCaptcha.current = { async getToken() { return null; }, resetToken() {} };
+  await input.onSubmitBtnClick({});
+  assert.equal(input.state.error, 'Complete the captcha before sending. It may have expired.');
+  input.faucetCaptcha.current.getToken = async () => 'fresh-token';
+  await input.onSubmitBtnClick({});
+  assert.equal(input.state.error, null);
+  assert.equal(calls.length, 1);
+});
+
+
+test('passport recovery content uses the inline Review error without a dialog', async () => {
+  const { page, calls, faucetContext } = setup();
+  const { input } = setupInput();
+  page.props.faucetConfig.modules.passport = { overrideScores: [0, 0, 20] };
+  faucetContext.faucetApi.startSession = async () => ({
+    status: 'failed', failedCode: 'PASSPORT_SCORE', failedData: { address },
+  });
+  input.state.reviewing = true;
+  input.state.targetAddr = '0x' + 'a'.repeat(40);
+  input.faucetCaptcha.current = { async getToken() { return 'token'; }, resetToken() {} };
+  input.props.submitInputs = (...args) => page.onSubmitInputs(...args);
+  await assert.rejects(input.onSubmitBtnClick({}), error => require('react').isValidElement(error));
+  assert.equal(calls.dialogs.length, 0);
+  assert.equal(input.state.error.props.className, 'passport-error');
+  assert.equal(input.renderError().props.children, input.state.error);
 });
