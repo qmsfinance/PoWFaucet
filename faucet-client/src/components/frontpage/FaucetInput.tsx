@@ -155,6 +155,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
               {submitBtnCaption}
           </button>
         </div>
+        <p className="qms-card__limit">LIMIT: 4 REQUESTS / 24H</p>
       </div>
     );
 	}
