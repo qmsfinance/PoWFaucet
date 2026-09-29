@@ -1,16 +1,25 @@
 #!/bin/bash
 set -e
 
-if [ -n "$FAUCET_NETWORK" ]; then
-  case "$FAUCET_NETWORK" in
-    devnet|stagenet|testnet)
-      printf '{"network":"%s"}\n' "$FAUCET_NETWORK" > /app/static/config.json
-      ;;
-    *)
-      echo "Unsupported FAUCET_NETWORK: $FAUCET_NETWORK (expected devnet, stagenet or testnet)" >&2
-      exit 1
-      ;;
-  esac
+if [ -n "$FAUCET_NETWORK" ] || [ -n "$REQUEST_AMOUNT" ] || [ -n "$REQUEST_CIRCLE" ]; then
+  node -e '
+    const fs = require("fs");
+    const path = "/app/static/config.json";
+    const config = JSON.parse(fs.readFileSync(path, "utf8"));
+    if (process.env.FAUCET_NETWORK) {
+      if (!["devnet", "stagenet", "testnet"].includes(process.env.FAUCET_NETWORK))
+        throw new Error("Unsupported FAUCET_NETWORK (expected devnet, stagenet or testnet)");
+      config.network = process.env.FAUCET_NETWORK;
+    }
+    for (const [env, key] of [["REQUEST_AMOUNT", "requestAmount"], ["REQUEST_CIRCLE", "requestCircle"]]) {
+      if (!process.env[env]) continue;
+      const value = Number(process.env[env]);
+      if (!Number.isSafeInteger(value) || value <= 0)
+        throw new Error(env + " must be a positive integer");
+      config[key] = value;
+    }
+    fs.writeFileSync(path, JSON.stringify(config) + "\n");
+  '
 fi
 
 if [ -z "$DISABLE_NGINX" ]; then
