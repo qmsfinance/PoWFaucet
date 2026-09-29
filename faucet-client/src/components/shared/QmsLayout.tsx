@@ -26,7 +26,7 @@ export function QmsLayout(props: { faucetConfig: IFaucetConfig; children: React.
             `Each request sends ${amount} ${getNetworkLabel(props.faucetConfig.network)} ${props.faucetConfig.faucetCoinSymbol} to your wallet.`,
             `${getNetworkLabel(props.faucetConfig.network)} ${props.faucetConfig.faucetCoinSymbol} has no real-world value.`,
             'Double-check your address.',
-            `Limit: ${props.faucetConfig.requestAmount ?? 4} requests per address or IP every ${props.faucetConfig.requestCircle ?? 24} hours.`,
+            `Limit: ${props.faucetConfig.requestAmount ?? 4} requests per user every ${props.faucetConfig.requestCircle ?? 24} hours.`,
           ].map((note, index) => <div key={index}><p>{('0' + (index + 1)).slice(-2)}</p><span>{note}</span></div>)}
         </div>
       </section>
