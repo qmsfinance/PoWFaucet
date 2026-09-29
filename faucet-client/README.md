@@ -23,6 +23,7 @@ The JS bundle includes these predefined networks:
 | --- | --- | --- | --- |
 | `stagenet` | QMS Stagenet / net1 | 424242 | https://rpc.net1.test-qms.com |
 | `devnet` (default) | QMS devnet / net2 | 424243 | https://rpc.net2.test-qms.com |
+| `testnet` | QMS Testnet / net3 | 19480 | https://rpc.net3.test-qms.com |
 
 Each preset also contains its explorer, DEX API, and native currency details.
 The selected preset controls displayed network details and transaction explorer
@@ -34,6 +35,7 @@ Switch the same prebuilt Docker image at startup:
 ```zsh
 docker run -e FAUCET_NETWORK=devnet -p 8080:8080 YOUR_IMAGE
 docker run -e FAUCET_NETWORK=stagenet -p 8080:8080 YOUR_IMAGE
+docker run -e FAUCET_NETWORK=testnet -p 8080:8080 YOUR_IMAGE
 ```
 
 Add the variable to your existing deployment arguments and config/data mounts.
