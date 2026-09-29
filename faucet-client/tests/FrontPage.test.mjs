@@ -166,7 +166,7 @@ test('a failed status lookup does not create a duplicate session', async () => {
 });
 
 const { FaucetInput } = await loadComponent('../src/components/frontpage/FaucetInput.tsx', {
-  default: require('react'), getPanels: () => [], getNetworkLabel: () => 'Devnet', toReadableAmount: () => '10',
+  default: require('react'), getPanels: () => [], getNetworkLabel: () => 'Testnet', toReadableAmount: () => '10',
 });
 
 function setupInput() {
@@ -274,15 +274,26 @@ test('submission errors reset captcha without leaving Review or losing address',
 
 test('first-step frontend validation blocks blank, whitespace, malformed, and zero addresses', async () => {
   const { input, calls } = setupInput();
+  input.props.faucetConfig.maxClaim = 10n;
+  input.props.faucetConfig.faucetCoinDecimals = 0;
+  input.props.faucetConfig.faucetCoinSymbol = 'QMS';
+  const notifications = [];
+  input.props.faucetContext.showNotification = (level, message) => notifications.push({ level, message });
   for(const value of ['', '   ', 'invalid address', '0x1234', '0x' + '0'.repeat(40), address]) {
     input.state.targetAddr = value;
     const form = input.render().props.children[0];
     const actions = form.props.children.find(child => child?.props?.className === 'faucet-actions center');
     const button = actions.props.children;
-    assert.equal(button.props.disabled, value !== address);
-    assert.equal(button.props.children[1], value === address ? 'Review' : 'Please enter a valid EVM address');
+    assert.equal(button.props.disabled, false);
+    assert.equal(button.props.children[1], 'Send 10 Testnet QMS');
+    assert.equal(notifications.length, 0);
     await input.onSubmitBtnClick();
     assert.equal(input.state.reviewing, value === address);
+    assert.deepEqual(notifications, value === address ? [] : [{
+      level: 'warning',
+      message: value.trim() ? 'Please enter a valid EVM address' : 'Please enter your wallet address',
+    }]);
+    notifications.length = 0;
     input.state.reviewing = false;
   }
   assert.equal(calls.length, 0);
