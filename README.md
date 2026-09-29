@@ -99,3 +99,11 @@ This faucet contains parts of code from the following projects:
 Both the upstream work and the QMS modifications are licensed under the GNU Affero General
 Public License v3.0, the text in [LICENSE](LICENSE). Copyright in the upstream work stays
 with its authors.
+
+## Frontend runtime configuration
+
+Docker startup accepts `FAUCET_NETWORK` (`devnet`, `stagenet` or `testnet`),
+`REQUEST_AMOUNT` (requests per period, default `4`), and `REQUEST_CIRCLE`
+(period in hours, default `24`). Request values must be positive integers.
+These update `/config.json` without rebuilding the frontend and control the
+displayed limits; configure backend rate limits separately.
