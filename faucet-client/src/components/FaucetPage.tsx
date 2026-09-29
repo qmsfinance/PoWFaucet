@@ -306,8 +306,11 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
             {this.renderNotifications()}
             <SlotOutlet slot="footer" faucetConfig={this.state.faucetConfig} navigate={(path) => { location.hash = path; }} />
             <footer className='faucet-footer'>
-              <span>© {new Date().getFullYear()} QMS Network</span>
-              <a className="qms-footer__help" href="https://docs.qms.finance/" target="_blank" rel="noopener noreferrer">Need help?</a>
+              <div className="qms-footer__left">
+                <span>© {new Date().getFullYear()} QMS Network</span>
+                <a className="qms-footer__help" href="https://docs.qms.finance/" target="_blank" rel="noopener noreferrer">Need help?</a>
+              </div>
+              <a className="qms-footer__credit" href="https://github.com/pk910/PoWFaucet" target="_blank" rel="noopener noreferrer">Powered by PoWFaucet</a>
             </footer>
           </FaucetPageContext.Provider>
         </FaucetConfigContext.Provider>
