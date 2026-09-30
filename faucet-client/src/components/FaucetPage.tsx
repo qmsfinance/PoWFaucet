@@ -226,7 +226,6 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
                 <span>{getNetworkLabel(this.state.faucetConfig.network)} Faucet</span>
               </div>
               <div className="qms-header__links">
-                <a className="qms-header__docs" href="https://docs.qms.finance/" target="_blank" rel="noopener noreferrer">DOCS</a>
                 <span className="faucet-status-link qms-network-status" onClick={() => this.onFaucetStatusClick()}>
                   <img src={(this.pageContext.faucetUrls.imagesUrl || "/images") + "/qms-dot.svg"} alt="" width="6" height="6" />
                   {this.state.faucetConfig.network?.chainName || 'Testnet'}
@@ -308,7 +307,6 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
             <footer className='faucet-footer'>
               <div className="qms-footer__left">
                 <span>© {new Date().getFullYear()} QMS Network</span>
-                <a className="qms-footer__help" href="https://docs.qms.finance/" target="_blank" rel="noopener noreferrer">Need help?</a>
               </div>
               <a className="qms-footer__credit" href="https://github.com/qmsfinance/PoWFaucet" target="_blank" rel="noopener noreferrer">Powered by PoWFaucet · Source (AGPL-3.0)</a>
             </footer>
