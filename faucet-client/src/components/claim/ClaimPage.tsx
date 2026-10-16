@@ -68,6 +68,9 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
   private notificationClient: ClaimNotificationClient;
   private notificationClientActive: boolean;
   private lastStatusPoll: number;
+  private retryTimer?: ReturnType<typeof setTimeout>;
+  private initialRetries = 0;
+  private unmounted = false;
 
   constructor(props: IClaimPageProps) {
     super(props);
@@ -115,11 +118,14 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
   }
 
   public componentDidMount() {
+    this.unmounted = false;
     this.refreshSessionStatus();
   }
 
   public componentWillUnmount() {
+    this.unmounted = true;
     clearTimeout(this.copyResetTimer);
+    clearTimeout(this.retryTimer);
     if(this.updateTimer) {
       clearTimeout(this.updateTimer);
       this.updateTimer = null;
@@ -135,6 +141,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
       return;
     
     this.loadingStatus = true;
+    this.lastStatusPoll = (new Date()).getTime();
     this.setState({
       loadingStatus: true,
     });
@@ -148,6 +155,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
       }
       this.setState({
         loadingStatus: false,
+        loadingError: false,
         sessionStatus: sessionStatus,
         lastSuccessfulClaim: this.cacheSuccessfulClaim(sessionStatus),
       }, () => {
@@ -159,6 +167,13 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
         loadingStatus: false,
         loadingError: err.error?.toString() || err.toString() || true,
       });
+      // Before the first status arrives nothing else polls (render needs one), so retry.
+      if(!this.unmounted && !this.state.sessionStatus && this.initialRetries < 5) {
+        this.retryTimer = setTimeout(() => {
+          this.retryTimer = undefined;
+          this.refreshSessionStatus();
+        }, 2000 * 2 ** this.initialRetries++);
+      }
     }
     this.loadingStatus = false;
   }
@@ -229,10 +244,12 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
           this.notificationClient.start();
         }
 
-        if(exactNow - this.lastStatusPoll > 30 * 1000 || this.state.sessionStatus.claimIdx <= (this.state.claimNotification?.confirmedIdx || 0)) {
-          this.lastStatusPoll = exactNow;
+        // confirmedIdx is the last receipt the faucet observed, not the highest contiguous one, so
+        // it can cover this claim while the server still says "claiming". Every response renders
+        // again: without a minimum interval this branch becomes a request loop.
+        let pollInterval = this.state.sessionStatus.claimIdx <= (this.state.claimNotification?.confirmedIdx || 0) ? 1000 : 30 * 1000;
+        if(!(exactNow - this.lastStatusPoll < pollInterval))
           this.refreshSessionStatus();
-        }
       }
       else {
         if(this.notificationClientActive) {
