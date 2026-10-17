@@ -1,5 +1,5 @@
 import React, { ReactElement } from 'react';
-import { MemoryRouter as Router, Routes, Route, Link, useLocation } from "react-router";
+import { HashRouter as Router, Routes, Route, Link, useLocation } from "react-router";
 
 import { FaucetApi } from '../common/FaucetApi';
 import { getNetworkLabel } from '../common/RuntimeConfig';
