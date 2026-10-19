@@ -28,6 +28,25 @@ export interface IStartSessionInput {
   [input: string]: any;
 }
 
+/**
+ * An answer that is not the json the api sends: a proxy's error page, a rate limit's 429, the
+ * empty body of a refused request. `status` tells a caller whether a retry can help.
+ */
+export class FaucetApiError extends Error {
+  public readonly status: number;
+
+  public constructor(status: number, message: string) {
+    super(message);
+    this.name = "FaucetApiError";
+    this.status = status;
+  }
+
+  /** the server or a proxy in front of it could not answer right now, or rate-limited this client */
+  public isTransient(): boolean {
+    return this.status === 429 || this.status >= 500;
+  }
+}
+
 export class FaucetApi {
   private faucetTime: FaucetTime;
   private apiBaseUrl: string;
@@ -75,7 +94,17 @@ export class FaucetApi {
     }
     
     return fetch(this.apiBaseUrl + endpoint + argsStr)
-      .then((rsp) => rsp.json());
+      .then((rsp) => this.parseResponse(rsp));
+  }
+
+  /** the api answers json; anything else becomes an error that names the status instead of a parser's complaint about html */
+  private async parseResponse(rsp: Response): Promise<any> {
+    let text = await rsp.text();
+    try {
+      return JSON.parse(text);
+    } catch(ex) {
+      throw new FaucetApiError(rsp.status, "HTTP " + rsp.status + (rsp.statusText ? " " + rsp.statusText : "") + (rsp.ok ? " (invalid response)" : ""));
+    }
   }
 
   public apiPost(endpoint: string, args?: {[arg: string]: string|number|undefined}, data?: any): Promise<any> {
@@ -102,7 +131,7 @@ export class FaucetApi {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(data),
-    }).then((rsp) => rsp.json());
+    }).then((rsp) => this.parseResponse(rsp));
   }
 
   public getFaucetConfig(): Promise<IFaucetConfig> {
