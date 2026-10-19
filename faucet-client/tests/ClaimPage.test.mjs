@@ -16,6 +16,15 @@ class FakeDate extends Date {
 }
 let timers = [];
 let fetchImpl = null;
+const sockets = [];
+// A socket the test drives: it never connects by itself and drops messages once closed.
+class FakeWebSocket {
+  constructor(url) { this.url = url; this.listeners = {}; this.closed = false; sockets.push(this); }
+  addEventListener(event, fn) { (this.listeners[event] ||= []).push(fn); }
+  close() { this.closed = true; }
+  fire(event, payload) { if(!this.closed) for(const fn of this.listeners[event] || []) fn(payload); }
+  send(action, data) { this.fire('message', { data: JSON.stringify({ action, data }) }); }
+}
 const context = vm.createContext({
   console: { log() {}, warn() {} },
   Date: FakeDate,
@@ -24,6 +33,7 @@ const context = vm.createContext({
   clearTimeout: id => { if(timers[id - 1]) timers[id - 1].cancelled = true; },
   localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
   fetch: (...args) => fetchImpl(...args),
+  WebSocket: FakeWebSocket,
 });
 
 async function loadComponent(path, exports) {
@@ -69,6 +79,14 @@ const { ClaimPage } = await loadComponent('../src/components/claim/ClaimPage.tsx
   ...ui, FaucetSession: { persistSessionInfo() {} }, emitHook: async () => {}, emitHookSafe() {}, ClaimNotificationClient,
 });
 const { DetailsPage } = await loadComponent('../src/components/details/DetailsPage.tsx', ui);
+const { PromiseDfd } = await loadComponent('../src/utils/PromiseDfd.ts', {});
+const realClient = await loadComponent('../src/components/claim/ClaimNotificationClient.ts', {
+  TypedEmitter: require('tiny-typed-emitter').TypedEmitter, PromiseDfd,
+});
+const { ClaimPage: ClaimPageOnRealSocket } = await loadComponent('../src/components/claim/ClaimPage.tsx', {
+  ...ui, FaucetSession: { persistSessionInfo() {} }, emitHook: async () => {}, emitHookSafe() {},
+  ClaimNotificationClient: realClient.ClaimNotificationClient,
+});
 
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const claiming = { session: 's', status: 'claiming', start: 1, tasks: [], balance: '4', target: '0x' + '1'.repeat(40), claimIdx: 5 };
@@ -99,10 +117,13 @@ function setup(Page, responses) {
   return { page, calls };
 }
 
-// the page's one-second timer, as setUpdateTimer arms it
+// Fire the page's own one-second timer (setUpdateTimer), so a test fails if that timer stops polling.
 async function tick(page, ms) {
   clock.now += ms;
-  page.pollClaimStatus();
+  const timer = [...timers].reverse().find(t => !t.cancelled && !t.fired && t.ms <= 1002);
+  assert.ok(timer, 'the page keeps its one-second timer');
+  timer.fired = true;
+  timer.fn();
   await flush();
 }
 
@@ -206,4 +227,33 @@ test('an html answer becomes a FaucetApiError that names the status', async () =
   fetchImpl = async () => ({ ok: false, status: 429, statusText: 'Too Many Requests', text: async () => '<html><body>429 Too Many Requests</body></html>' });
   const api = new FaucetApi('/api');
   await assert.rejects(api.getSessionStatus('s'), error => error instanceof FaucetApiError && error.status === 429 && error.isTransient());
+});
+
+test('on the real socket: settled, then the closing error while the request is in flight, asks once and throws nothing', async () => {
+  sockets.length = 0;
+  let release;
+  const { page, calls } = setup(ClaimPageOnRealSocket, [claiming]);
+  page.componentDidMount();
+  await flush();
+  assert.equal(sockets.length, 1, 'a claiming status opens the socket');
+  const socket = sockets[0];
+  socket.fire('open', {});
+  page.props.pageContext.faucetApi.getSessionStatus = () => { calls.status++; return new Promise(resolve => { release = resolve; }); };
+  socket.send('update', { processedIdx: 5, confirmedIdx: 5, settled: true });
+  assert.equal(calls.status, 2);
+  assert.doesNotThrow(() => socket.send('error', { reason: 'claim settled' }));
+  assert.equal(calls.status, 2, 'the closing error during the request does not start another');
+  release({ ...finished });
+  await flush();
+  assert.equal(page.state.sessionStatus.status, 'finished');
+  assert.equal(socket.closed, true, 'a final status closes the socket');
+});
+
+test('the notification client swallows the server closing error when nobody listens for it', () => {
+  sockets.length = 0;
+  const client = new realClient.ClaimNotificationClient({ claimWsUrl: 'ws://faucet.test/ws/claim', sessionId: 's' });
+  client.start();
+  sockets[0].fire('open', {});
+  assert.doesNotThrow(() => sockets[0].send('error', { reason: 'claim settled' }));
+  client.stop();
 });
