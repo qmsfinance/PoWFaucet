@@ -23,7 +23,7 @@ The JS bundle includes these predefined networks:
 | --- | --- | --- | --- |
 | `stagenet` | QMS Stagenet / net1 | 424242 | https://rpc.net1.test-qms.com |
 | `devnet` (default) | QMS devnet / net2 | 424243 | https://rpc.net2.test-qms.com |
-| `testnet` | QMS Testnet / net3 | 19480 | https://rpc.net3.test-qms.com |
+| `testnet` | QMS Testnet / net3 | 19480 | https://rpc.testnet.qms.finance |
 
 Each preset also contains its explorer, DEX API, and native currency details.
 The selected preset controls displayed network details and transaction explorer
@@ -57,6 +57,6 @@ Reload the browser after changing the runtime file. Missing or unknown runtime
 configuration prevents frontend initialization and logs the config error.
 Legacy `{ "chainId": "424242" }` files still display only the chain ID.
 
-To add the future `testnet`, add its verified values to `NETWORKS` in
-`src/common/RuntimeConfig.ts` and allow `testnet` in `docker/entrypoint.sh`.
+To add another network, add its verified values to `NETWORKS` in
+`src/common/RuntimeConfig.ts` and allow its selector in `docker/entrypoint.sh`.
 Build one updated image; runtime environment selection still needs no rebuild.
