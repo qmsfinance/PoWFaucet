@@ -14,6 +14,7 @@ import { FaucetWorkers } from '../src/common/FaucetWorker.js';
 import { ICaptchaConfig } from '../src/modules/captcha/CaptchaConfig.js';
 import { IGithubConfig } from '../src/modules/github/GithubConfig.js';
 import { IPassportConfig } from '../src/modules/passport/PassportConfig.js';
+import { IMySQLOptions } from '../src/db/driver/MySQLDriver.js';
 
 
 describe("Faucet Process", () => {
@@ -277,6 +278,56 @@ describe("Faucet Process", () => {
       process.env.FAUCET_PASSPORT_SCORER_API_KEY = oldPassportScorerApiKey;
     else
       delete process.env.FAUCET_PASSPORT_SCORER_API_KEY;
+
+    cliArgs["config"] = oldConfigArg;
+    cliArgs["datadir"] = oldDatadir;
+  });
+
+  it("Check database env overrides", async () => {
+    let oldConfigArg = cliArgs["config"];
+    let oldDatadir = cliArgs["datadir"];
+    let oldDbHost = process.env.FAUCET_DB_HOST;
+    let oldDbPassword = process.env.FAUCET_DB_PASSWORD;
+
+    let tempdir = tmpFile("powfaucet-", "-data");
+    fs.mkdirSync(tempdir);
+    cliArgs["datadir"] = tempdir;
+    process.env.FAUCET_DB_HOST = "env-db-host";
+    process.env.FAUCET_DB_PASSWORD = "env-db-password";
+
+    fs.writeFileSync(path.join(tempdir, "mysql-config.yaml"), [
+      "version: 2",
+      "database:",
+      "  driver: mysql",
+      "  host: yaml-db-host",
+      "  username: faucet",
+      "  password: yaml-db-password",
+      "  database: faucet",
+    ].join("\n"));
+    cliArgs["config"] = "mysql-config.yaml";
+    loadFaucetConfig();
+    expect((faucetConfig.database as IMySQLOptions).host).to.equal("env-db-host", "env override for db host not applied");
+    expect((faucetConfig.database as IMySQLOptions).password).to.equal("env-db-password", "env override for db password not applied");
+
+    fs.writeFileSync(path.join(tempdir, "sqlite-config.yaml"), [
+      "version: 2",
+      "database:",
+      "  driver: sqlite",
+      "  file: faucet-store.db",
+    ].join("\n"));
+    cliArgs["config"] = "sqlite-config.yaml";
+    loadFaucetConfig();
+    expect((faucetConfig.database as any).host).to.equal(undefined, "db host override applied to a sqlite config");
+    expect((faucetConfig.database as any).password).to.equal(undefined, "db password override applied to a sqlite config");
+
+    if(typeof oldDbHost === "string")
+      process.env.FAUCET_DB_HOST = oldDbHost;
+    else
+      delete process.env.FAUCET_DB_HOST;
+    if(typeof oldDbPassword === "string")
+      process.env.FAUCET_DB_PASSWORD = oldDbPassword;
+    else
+      delete process.env.FAUCET_DB_PASSWORD;
 
     cliArgs["config"] = oldConfigArg;
     cliArgs["datadir"] = oldDatadir;
