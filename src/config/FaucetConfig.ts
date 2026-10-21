@@ -10,6 +10,7 @@ import { getDefaultConfig } from './DefaultConfig.js';
 import { ICaptchaConfig } from '../modules/captcha/CaptchaConfig.js';
 import { IGithubConfig } from '../modules/github/GithubConfig.js';
 import { IPassportConfig } from '../modules/passport/PassportConfig.js';
+import { IMySQLOptions } from '../db/driver/MySQLDriver.js';
 
 export let cliArgs = (function() {
   let args = {};
@@ -140,6 +141,13 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
     if(!faucetConfig.modules.passport)
       faucetConfig.modules.passport = {} as IPassportConfig;
     (faucetConfig.modules.passport as IPassportConfig).scorerApiKey = process.env.FAUCET_PASSPORT_SCORER_API_KEY;
+  }
+  // Only the mysql driver has a host and a password; a sqlite config ignores them.
+  if(faucetConfig.database?.driver === "mysql") {
+    if(process.env.FAUCET_DB_HOST)
+      (faucetConfig.database as IMySQLOptions).host = process.env.FAUCET_DB_HOST;
+    if(process.env.FAUCET_DB_PASSWORD)
+      (faucetConfig.database as IMySQLOptions).password = process.env.FAUCET_DB_PASSWORD;
   }
   if(process.env.FAUCET_SERVER_PORT) {
     faucetConfig.serverPort = parseInt(process.env.FAUCET_SERVER_PORT, 10);
