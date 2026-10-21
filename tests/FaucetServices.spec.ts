@@ -14,6 +14,7 @@ import { FaucetSession, FaucetSessionStatus } from '../src/session/FaucetSession
 import { IIPInfo } from '../src/modules/ipinfo/IPInfoResolver.js';
 import { FaucetStatsLog } from '../src/services/FaucetStatsLog.js';
 import { ClaimTxStatus, EthClaimManager } from '../src/eth/EthClaimManager.js';
+import { FaucetDatabase } from '../src/db/FaucetDatabase.js';
 import { FaucetStatus, FaucetStatusLevel } from '../src/services/FaucetStatus.js';
 
 
@@ -103,6 +104,9 @@ describe("Faucet Services", () => {
       };
       let statsLog = ServiceManager.GetService(FaucetStatsLog);
       statsLog.initialize();
+      // a claim is queued only once its row is written
+      let db = ServiceManager.GetService(FaucetDatabase);
+      await db.initialize();
       await ServiceManager.GetService(ModuleManager).initialize();
       let testSession = await ServiceManager.GetService(SessionManager).createSession("8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" });
       expect(testSession.getSessionStatus()).to.equal(FaucetSessionStatus.CLAIMABLE, "unexpected session status");
@@ -120,6 +124,7 @@ describe("Faucet Services", () => {
       expect(statsEntryJson.to).to.equal("0x0000000000000000000000000000000000001337", "unexpected claim stats value: eth address");
       expect(statsEntryJson.val).to.equal("100000", "unexpected claim stats value: amount");
       expect(statsEntryJson.sess).to.equal(testSession.getSessionId(), "unexpected claim stats value: session id");
+      await db.closeDatabase();
     });
 
     it("Check aggregated stats processing", async () => {

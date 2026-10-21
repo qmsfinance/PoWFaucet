@@ -322,30 +322,60 @@ export class EthWalletManager {
     });
   }
 
-  public async sendClaimTx(claimInfo: EthClaimInfo): Promise<TransactionResult> {
+  /**
+   * beforeSend runs once per attempt, after the transaction is signed (txNonce, txHex and txHash are
+   * set) and before it reaches the network. A rejection stops the send and is rethrown as is: a claim
+   * whose record cannot be written must not be paid, or a restart would find it queued and pay it again.
+   */
+  public async sendClaimTx(claimInfo: EthClaimInfo, beforeSend?: () => Promise<void>): Promise<TransactionResult> {
     let txPromise: Promise<TransactionReceipt>;
     let retryCount = 0;
     let txError: Error;
     let buildTx = () => {
       claimInfo.claim.txNonce = this.walletState.nonce;
       if(this.tokenState)
-        return this.buildEthTx(this.tokenState.address, 0n, claimInfo.claim.txNonce, this.tokenState.getTransferData(claimInfo.target, BigInt(claimInfo.amount)));
+        return this.buildSignedTx(this.tokenState.address, 0n, claimInfo.claim.txNonce, this.tokenState.getTransferData(claimInfo.target, BigInt(claimInfo.amount)));
       else
-        return this.buildEthTx(claimInfo.target, BigInt(claimInfo.amount), claimInfo.claim.txNonce);
+        return this.buildSignedTx(claimInfo.target, BigInt(claimInfo.amount), claimInfo.claim.txNonce);
     };
 
+    // Once a transaction has been broadcast it is never signed anew: a lost response may hide an
+    // accepted one, and a second transaction at the next nonce would pay the claim twice. A retry
+    // resends the same one; "nonce too low" means a transaction took that nonce, most likely this
+    // one, so the claim waits for its receipt. If another transaction took it, the claim stays
+    // pending: bin/faucet-drain.sh --requeue-orphans pays it again, after a human has checked.
+    let broadcast = false;
     do {
+      let beforeSendError: any;
       try {
-        claimInfo.claim.txHex = await buildTx();
+        if(!broadcast) {
+          let signed = await buildTx();
+          claimInfo.claim.txHex = signed.hex;
+          claimInfo.claim.txHash = signed.hash;
+          if(beforeSend) {
+            await beforeSend().catch((ex) => {
+              beforeSendError = ex;
+              throw ex;
+            });
+          }
+        }
+        broadcast = true;
         let txResult = await this.sendTransaction(claimInfo.claim.txHex, claimInfo.claim.txNonce);
         claimInfo.claim.txHash = txResult[0];
         txPromise = txResult[1];
       } catch(ex) {
+        if(beforeSendError)
+          throw beforeSendError;
         if(!txError)
           txError = ex;
         ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Sending TX for " + claimInfo.target + " failed [try: " + retryCount + "]: " + ex.toString());
+        if(broadcast && (ex.toString().match(/nonce too low|nonce has already been used|already known|known transaction/i) || await this.isTxKnown(claimInfo.claim.txHash))) {
+          txPromise = this.awaitTransactionReceipt(claimInfo.claim.txHash, claimInfo.claim.txNonce);
+          break;
+        }
         await sleepPromise(2000); // wait 2 secs and try again - maybe EL client is busy...
-        await this.loadWalletState();
+        if(!broadcast)
+          await this.loadWalletState(); // nothing left yet: safe to sign again at a fresh nonce
       }
     } while(!txPromise && retryCount++ < 3);
     if(!txPromise)
@@ -373,6 +403,27 @@ export class EthWalletManager {
     };
   }
 
+  /**
+   * Sends a claim's already signed transaction again, unchanged: same nonce, same hash, so it can never
+   * pay twice. The node answers "already known" or "nonce too low" when it has it, which is fine.
+   */
+  public async rebroadcastClaimTx(claimInfo: EthClaimInfo): Promise<void> {
+    try {
+      await this.rpcPool.broadcastSendRawTransaction("0x" + claimInfo.claim.txHex);
+    } catch(ex) {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Rebroadcast of claim tx " + claimInfo.claim.txHash + " (nonce " + claimInfo.claim.txNonce + "): " + ex.toString());
+    }
+  }
+
+  /** true only when the node has it; a failed lookup is not an answer, so it is false too */
+  private async isTxKnown(txHash: string): Promise<boolean> {
+    try {
+      return !!(await this.web3.eth.getTransaction(txHash));
+    } catch(ex) {
+      return false;
+    }
+  }
+
   public async sendCustomTx(target: string, amount: bigint, data?: string, gasLimit?: number): Promise<TransactionResult> {
     let txHex = await this.buildEthTx(target, amount, this.walletState.nonce, data, gasLimit);
     let txResult = await this.sendTransaction(txHex, this.walletState.nonce);
@@ -395,6 +446,10 @@ export class EthWalletManager {
   }
 
   private async buildEthTx(target: string, amount: bigint, nonce: number, data?: string, gasLimit?: number): Promise<string> {
+    return (await this.buildSignedTx(target, amount, nonce, data, gasLimit)).hex;
+  }
+
+  private async buildSignedTx(target: string, amount: bigint, nonce: number, data?: string, gasLimit?: number): Promise<{ hex: string; hash: string }> {
     if(target.match(/^0X/))
       target = "0x" + target.substring(2);
 
@@ -433,7 +488,10 @@ export class EthWalletManager {
     }
 
     tx = tx.sign(this.walletKey);
-    return Buffer.from(tx.serialize()).toString('hex');
+    return {
+      hex: Buffer.from(tx.serialize()).toString('hex'),
+      hash: EthUtil.bytesToHex(tx.hash()),
+    };
   }
 
   private async sendTransaction(txhex: string, txnonce: number): Promise<[string, Promise<TransactionReceipt>]> {

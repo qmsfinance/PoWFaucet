@@ -398,7 +398,8 @@ export class FaucetDatabase {
     );
   }
 
-  public async updateClaimData(sessionId: string, claimData: EthClaimData): Promise<void> {
+  /** resolves to the number of rows written: 0 when the session is not (or not yet) claiming */
+  public async updateClaimData(sessionId: string, claimData: EthClaimData): Promise<number> {
     let status: FaucetSessionStatus;
     switch(claimData.claimStatus) {
       case ClaimTxStatus.CONFIRMED:
@@ -411,11 +412,12 @@ export class FaucetDatabase {
         status = FaucetSessionStatus.CLAIMING;
         break;
     }
-    await this.db.run("UPDATE Sessions SET Status = ?, ClaimData = ? WHERE Status = 'claiming' AND SessionId = ?", [
+    let res = await this.db.run("UPDATE Sessions SET Status = ?, ClaimData = ? WHERE Status = 'claiming' AND SessionId = ?", [
       status,
       JSON.stringify(claimData),
       sessionId
     ]);
+    return res.changes;
   }
 
   public async getClaimableAmount(): Promise<bigint> {

@@ -197,7 +197,7 @@ describe("ETH Claim Manager", () => {
       return sleepPromise(50);
     });
     let testSession = await addTestSession(FaucetSessionStatus.CLAIMABLE, null);
-    claimManager.createSessionClaim(testSession, {});
+    let firstClaim = claimManager.createSessionClaim(testSession, {});
 
     let error: FaucetError | null = null;
     try {
@@ -208,6 +208,7 @@ describe("ETH Claim Manager", () => {
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
     expect(error?.getCode()).to.equal("RACE_CLAIMING", "unexpected error code");
+    await firstClaim; // queued once its row is written
     expect(claimManager.getTransactionQueue().length).to.equal(1, "unexpected queue count");
   });
 
@@ -330,6 +331,107 @@ describe("ETH Claim Manager", () => {
 
     expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.FAILED, "unexpected claim status after processQueue");
     expect(claim.claim.txError).to.matches(/test error/, "unexpected claim error message");
+  });
+
+  it("Queue processing: a claim whose record cannot be written is not sent and stays queued", async () => {
+    let claimManager = ServiceManager.GetService(EthClaimManager);
+    await claimManager.initialize();
+    let testSession = await addTestSession(FaucetSessionStatus.CLAIMABLE, null);
+    let claim = await claimManager.createSessionClaim(testSession, {});
+
+    globalStubs["getWalletState"] = sinon.stub(EthWalletManager.prototype, "getWalletState").returns({
+      ready: true,
+      nonce: 0,
+      balance: 1000000000000000000n,
+      nativeBalance: 1000000000000000000n,
+    });
+    let sent = 0;
+    globalStubs["EthWalletManager.sendClaimTx"].callsFake(async (claimInfo: EthClaimInfo, beforeSend?: () => Promise<void>) => {
+      claimInfo.claim.txNonce = 7;
+      claimInfo.claim.txHex = "02aa";
+      claimInfo.claim.txHash = "0x7c4074c4d182e312adf698795835cbd2d597246cdd47013f09c7bb81f33a3611";
+      await beforeSend();
+      sent++;
+      return { txHash: claimInfo.claim.txHash, txPromise: new Promise(() => {}) };
+    });
+    let dbDown = true;
+    let updateClaimData = FaucetDatabase.prototype.updateClaimData;
+    globalStubs["FaucetDatabase.updateClaimData"] = sinon.stub(FaucetDatabase.prototype, "updateClaimData").callsFake(function(this: FaucetDatabase, sessionId: string, claimData: any) {
+      if(dbDown)
+        return Promise.reject("db down");
+      return updateClaimData.call(this, sessionId, claimData);
+    });
+
+    await claimManager.processQueue();
+    expect(sent).to.equal(0, "transaction sent although its record was not written");
+    expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.QUEUE, "claim not back in the queue");
+    expect(claim.claim.txHash).to.equal(undefined, "stale txHash left on the queued claim");
+    expect(claimManager.getTransactionQueue(true).map((c) => c.session)).to.deep.equal([testSession.sessionId], "claim missing from the queue");
+
+    dbDown = false;
+    await claimManager.processQueue();
+    expect(sent).to.equal(1, "claim not sent once the database is back");
+    expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.PENDING, "unexpected claim status after the retry");
+    let stored = await ServiceManager.GetService(FaucetDatabase).getSession(testSession.sessionId);
+    expect(stored.claim.txHash).to.equal(claim.claim.txHash, "signed transaction not on record before the send");
+  });
+
+  it("Queue processing: a record write that matches no row does not let the claim be sent", async () => {
+    let claimManager = ServiceManager.GetService(EthClaimManager);
+    await claimManager.initialize();
+    let testSession = await addTestSession(FaucetSessionStatus.CLAIMABLE, null);
+    let claim = await claimManager.createSessionClaim(testSession, {});
+    globalStubs["getWalletState"] = sinon.stub(EthWalletManager.prototype, "getWalletState").returns({
+      ready: true,
+      nonce: 0,
+      balance: 1000000000000000000n,
+      nativeBalance: 1000000000000000000n,
+    });
+    let sent = 0;
+    globalStubs["EthWalletManager.sendClaimTx"].callsFake(async (claimInfo: EthClaimInfo, beforeSend?: () => Promise<void>) => {
+      claimInfo.claim.txNonce = 7;
+      claimInfo.claim.txHex = "02aa";
+      claimInfo.claim.txHash = "0x7c4074c4d182e312adf698795835cbd2d597246cdd47013f09c7bb81f33a3633";
+      await beforeSend();
+      sent++;
+      return { txHash: claimInfo.claim.txHash, txPromise: new Promise(() => {}) };
+    });
+    globalStubs["FaucetDatabase.updateClaimData"] = sinon.stub(FaucetDatabase.prototype, "updateClaimData").resolves(0);
+
+    await claimManager.processQueue();
+    expect(sent).to.equal(0, "transaction sent although no row was written");
+    expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.QUEUE, "claim not back in the queue");
+  });
+
+  it("Restore: a processing claim with a signed transaction is rebroadcast, not paid again", async () => {
+    let signed = await addTestSession(FaucetSessionStatus.CLAIMING, {
+      claimIdx: 3,
+      claimStatus: ClaimTxStatus.PROCESSING,
+      claimTime: Math.floor(new Date().getTime() / 1000),
+      txNonce: 5,
+      txHex: "02bb",
+      txHash: "0x7c4074c4d182e312adf698795835cbd2d597246cdd47013f09c7bb81f33a3622",
+    });
+    let unsigned = await addTestSession(FaucetSessionStatus.CLAIMING, {
+      claimIdx: 4,
+      claimStatus: ClaimTxStatus.PROCESSING,
+      claimTime: Math.floor(new Date().getTime() / 1000),
+    });
+    let rebroadcast: string[] = [];
+    globalStubs["rebroadcastClaimTx"] = sinon.stub(EthWalletManager.prototype, "rebroadcastClaimTx").callsFake(async (claimInfo: EthClaimInfo) => {
+      rebroadcast.push(claimInfo.session);
+    });
+    globalStubs["watchClaimTx"] = sinon.stub(EthWalletManager.prototype, "watchClaimTx").returns(new Promise(() => {}));
+    globalStubs["loadWalletState"] = sinon.stub(EthWalletManager.prototype, "loadWalletState").resolves();
+
+    let claimManager = ServiceManager.GetService(EthClaimManager);
+    await claimManager.initialize();
+
+    expect(rebroadcast).to.deep.equal([signed.sessionId], "signed processing claim not rebroadcast exactly once");
+    let pending = claimManager.getTransactionQueue().find((c) => c.session === signed.sessionId);
+    expect(pending.claim.claimStatus).to.equal(ClaimTxStatus.PENDING, "rebroadcast claim not watched as pending");
+    expect(claimManager.getTransactionQueue(true).map((c) => c.session)).to.deep.equal([unsigned.sessionId], "only the unsigned processing claim belongs in the queue");
+    expect(globalStubs["loadWalletState"].called).to.equal(true, "wallet nonce not reloaded after the rebroadcast");
   });
 
   it("Queue processing: Check processing if transaction creation fails unexpectedly", async () => {

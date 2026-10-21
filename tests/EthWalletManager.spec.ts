@@ -524,6 +524,142 @@ describe("ETH Wallet Manager", () => {
     expect(claimTx.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED, "unexpected claimTx status 2");
   }).timeout(10000);
 
+  it("send ClaimTx transaction (lost response: the node already has it)", async () => {
+    let known: {[hash: string]: boolean} = {};
+    faucetConfig.ethChainId = 1337;
+    faucetConfig.spareFundsAmount = 0;
+    faucetConfig.ethTxGasLimit = 21000;
+    faucetConfig.ethTxMaxFee = 100000000000;
+    faucetConfig.ethTxPrioFee = 2000000000;
+    faucetConfig.minDropAmount = 1000;
+    await ServiceManager.GetService(FaucetDatabase).initialize();
+    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
+    let ethClaimManager = ServiceManager.GetService(EthClaimManager);
+    fakeProvider.injectResponse("eth_getBalance", "1000000000000000000");
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
+    fakeProvider.injectResponse("eth_getTransactionCount", () => known["accepted"] ? 43 : 42); // the pending count moves once the node has it
+    // the node takes the first broadcast but the answer is lost; a retry must not sign a second
+    // payment at the next nonce
+    let broadcasts: string[] = [];
+    fakeProvider.injectResponse("eth_sendRawTransaction", (payload) => {
+      broadcasts.push(payload.params[0]);
+      known["accepted"] = true;
+      return { _throw: new FetchError("invalid json response", "invalid-json") };
+    });
+    let hash: string;
+    fakeProvider.injectResponse("eth_getTransactionByHash", (payload) => {
+      hash = payload.params[0];
+      return known["accepted"] ? { hash: hash, nonce: "0x2a" } : null;
+    });
+    fakeProvider.injectResponse("eth_getTransactionReceipt", (payload) => {
+      hash = payload.params[0];
+      return {
+      "blockHash": "0xfce202c4104864d81d8bd78b7202a77e5dca634914a3fd6636f2765d65fa9a07",
+      "blockNumber": "0x8aa5ae",
+      "contractAddress": null,
+      "cumulativeGasUsed": "0x1752665",
+      "effectiveGasPrice": "0x3b9aca00",
+      "from": "0x917c0A57A0FaA917f8ac7cA8Dd52db0b906a59d2",
+      "gasUsed": "0x5208",
+      "logs": [],
+      "logsBloom": "0x" + "0".repeat(512),
+      "status": "0x1",
+      "to": "0x0000000000000000000000000000000000001337",
+      "transactionHash": hash,
+      "transactionIndex": "0x3d",
+      "type": "0x2"
+    };
+    });
+    await ethWalletManager.initialize();
+    await ethWalletManager.loadWalletState();
+    let claimTx = await ethClaimManager.createSessionClaim({
+      sessionId: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
+      status: FaucetSessionStatus.CLAIMABLE,
+      startTime: Math.floor(new Date().getTime() / 1000),
+      targetAddr: "0x0000000000000000000000000000000000001337",
+      dropAmount: "1337",
+      remoteIP: "8.8.8.8",
+      tasks: [], data: {}, claim: null,
+    }, {});
+    ethClaimManager.processQueue();
+    await awaitSleepPromise(6000, () => claimTx.claim.claimStatus === ClaimTxStatus.CONFIRMED);
+    expect(claimTx.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED, "claim not confirmed");
+    expect(new Set(broadcasts).size).to.equal(1, "a second, different transaction was signed for the same claim");
+    expect(claimTx.claim.txNonce).to.equal(42, "unexpected nonce");
+  }).timeout(10000);
+
+  it("send ClaimTx transaction (nonce too low after a broadcast: never signed again)", async () => {
+    faucetConfig.ethChainId = 1337;
+    faucetConfig.spareFundsAmount = 0;
+    faucetConfig.ethTxGasLimit = 21000;
+    faucetConfig.ethTxMaxFee = 100000000000;
+    faucetConfig.ethTxPrioFee = 2000000000;
+    faucetConfig.minDropAmount = 1000;
+    await ServiceManager.GetService(FaucetDatabase).initialize();
+    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
+    let ethClaimManager = ServiceManager.GetService(EthClaimManager);
+    fakeProvider.injectResponse("eth_getBalance", "1000000000000000000");
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
+    let nonce = 42;
+    fakeProvider.injectResponse("eth_getTransactionCount", () => nonce);
+    let broadcasts: string[] = [];
+    fakeProvider.injectResponse("eth_sendRawTransaction", (payload) => {
+      broadcasts.push(payload.params[0]);
+      if(broadcasts.length === 1) {
+        nonce = 43; // someone else used 42
+        return { _throw: new Error("nonce too low") };
+      }
+      return "0x1337b2933e4d908d44948ae7f8ec3184be10bbd67ba3c4b165be654281337337";
+    });
+    // the hash lookup fails, as on a node without the tx index or behind a timeout: no answer
+    fakeProvider.injectResponse("eth_getTransactionByHash", () => ({ _throw: new FetchError("timeout", "request-timeout") }));
+    let hash = "0x1337b2933e4d908d44948ae7f8ec3184be10bbd67ba3c4b165be654281337337";
+    fakeProvider.injectResponse("eth_getTransactionReceipt", {
+      "blockHash": "0xfce202c4104864d81d8bd78b7202a77e5dca634914a3fd6636f2765d65fa9a07",
+      "blockNumber": "0x8aa5ae",
+      "contractAddress": null,
+      "cumulativeGasUsed": "0x1752665",
+      "effectiveGasPrice": "0x3b9aca00",
+      "from": "0x917c0A57A0FaA917f8ac7cA8Dd52db0b906a59d2",
+      "gasUsed": "0x5208",
+      "logs": [],
+      "logsBloom": "0x" + "0".repeat(512),
+      "status": "0x1",
+      "to": "0x0000000000000000000000000000000000001337",
+      "transactionHash": hash,
+      "transactionIndex": "0x3d",
+      "type": "0x2"
+    });
+    let written: number[] = [];
+    let updateClaimData = FaucetDatabase.prototype.updateClaimData;
+    let dbStub = sinon.stub(FaucetDatabase.prototype, "updateClaimData").callsFake(function(this: FaucetDatabase, sessionId: string, claimData: any) {
+      if(claimData.claimStatus === ClaimTxStatus.PROCESSING)
+        written.push(claimData.txNonce);
+      return updateClaimData.call(this, sessionId, claimData);
+    });
+    try {
+      await ethWalletManager.initialize();
+      await ethWalletManager.loadWalletState();
+      let claimTx = await ethClaimManager.createSessionClaim({
+        sessionId: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
+        status: FaucetSessionStatus.CLAIMABLE,
+        startTime: Math.floor(new Date().getTime() / 1000),
+        targetAddr: "0x0000000000000000000000000000000000001337",
+        dropAmount: "1337",
+        remoteIP: "8.8.8.8",
+        tasks: [], data: {}, claim: null,
+      }, {});
+      ethClaimManager.processQueue();
+      await awaitSleepPromise(6000, () => claimTx.claim.claimStatus === ClaimTxStatus.CONFIRMED);
+      expect(claimTx.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED, "claim not confirmed");
+      expect(new Set(broadcasts).size).to.equal(1, "a second transaction was signed for the same claim");
+      expect(written).to.deep.equal([42], "a second identity was recorded for the same claim");
+      expect(claimTx.claim.txNonce).to.equal(42, "the claim moved to another nonce");
+    } finally {
+      dbStub.restore();
+    }
+  }).timeout(10000);
+
   it("send ClaimTx transaction (RPC/HTTP error on receipt poll)", async () => {
     faucetConfig.ethChainId = 1337;
     faucetConfig.spareFundsAmount = 0;
