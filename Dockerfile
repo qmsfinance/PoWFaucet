@@ -51,4 +51,8 @@ USER nginx
 WORKDIR /data
 
 EXPOSE 8080
+# The nginx base image sets STOPSIGNAL SIGQUIT, which entrypoint.sh does not trap: as PID 1
+# it ignores it, so node never saves its sessions and is SIGKILLed at the grace period,
+# which can leave the SQLite lock behind. Keep this in step with the signals entrypoint.sh traps.
+STOPSIGNAL SIGTERM
 ENTRYPOINT [ "/entrypoint.sh" ]
