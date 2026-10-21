@@ -16,6 +16,12 @@ import { FaucetOutflowModule } from '../modules/faucet-outflow/FaucetOutflowModu
 import { clearInterval } from 'timers';
 import { TransactionReceipt } from 'web3';
 
+class ClaimNotPersistedError extends Error {
+  public constructor(cause: any) {
+    super("claim record not written: " + cause, { cause });
+  }
+}
+
 export enum ClaimTxStatus {
   QUEUE = "queue",
   PROCESSING = "processing",
@@ -81,6 +87,7 @@ export class EthClaimManager {
 
     // restore saved claimTx queue
     let maxQueueIdx = 0;
+    let rebroadcast: EthClaimInfo[] = [];
     let storedSession = await  ServiceManager.GetService(FaucetDatabase).getSessions([
       FaucetSessionStatus.CLAIMING,
     ]);
@@ -92,8 +99,18 @@ export class EthClaimManager {
         claim: sessionData.claim,
       };
       switch(claimInfo.claim.claimStatus) {
-        case ClaimTxStatus.QUEUE:
         case ClaimTxStatus.PROCESSING:
+          // Signed and recorded before it was sent, so it may be on the network already: send the
+          // same transaction again and wait for it, rather than paying the claim a second time.
+          if(claimInfo.claim.txHex && claimInfo.claim.txHash) {
+            claimInfo.claim.claimStatus = ClaimTxStatus.PENDING;
+            this.pendingTxQueue[claimInfo.claim.txHash] = claimInfo;
+            this.claimTxDict[claimInfo.session] = claimInfo;
+            rebroadcast.push(claimInfo);
+            break;
+          }
+          // fallthrough: recorded before a transaction existed
+        case ClaimTxStatus.QUEUE:
           this.claimTxQueue.push(claimInfo);
           this.claimTxDict[claimInfo.session] = claimInfo;
           break;
@@ -112,6 +129,17 @@ export class EthClaimManager {
 
     this.claimTxQueue.sort((a, b) => a.claim.claimIdx - b.claim.claimIdx);
     this.lastClaimTxIdx = maxQueueIdx + 1;
+
+    if(rebroadcast.length > 0) {
+      let ethWalletManager = ServiceManager.GetService(EthWalletManager);
+      rebroadcast.sort((a, b) => a.claim.txNonce - b.claim.txNonce);
+      for(let claimInfo of rebroadcast) {
+        await ethWalletManager.rebroadcastClaimTx(claimInfo);
+        this.awaitTxReceipt(claimInfo, ethWalletManager.watchClaimTx(claimInfo));
+      }
+      // the wallet read its nonce before these were back in the pool
+      await ethWalletManager.loadWalletState();
+    }
 
     // register claim ws endpoint
     ServiceManager.GetService(FaucetHttpServer).addWssEndpoint("claim", /^\/ws\/claim($|\?)/, (req, ws, ip) => this.processClaimNotificationWebSocket(req, ws, ip));
@@ -218,7 +246,7 @@ export class EthClaimManager {
       moduleManager.getModule<FaucetOutflowModule>("faucet-outflow")?.updateState(null, BigInt(claimInfo.claim.txFee));
       ServiceManager.GetService(FaucetStatsLog).addClaimStats(claimInfo);
     }
-    let write: Promise<void> = ServiceManager.GetService(FaucetDatabase).updateClaimData(claimInfo.session, claimInfo.claim).catch((ex) => {
+    let write: Promise<void> = ServiceManager.GetService(FaucetDatabase).updateClaimData(claimInfo.session, claimInfo.claim).then(() => {}).catch((ex) => {
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Could not store the claim data of session " + claimInfo.session + ": " + ex.toString());
     }).then(() => {
       this.claimWrites.delete(write);
@@ -266,10 +294,19 @@ export class EthClaimManager {
     sessionData.status = FaucetSessionStatus.CLAIMING;
     sessionData.dropAmount = claimInfo.amount;
     sessionData.claim = claimInfo.claim;
-    ServiceManager.GetService(FaucetDatabase).updateSession(sessionData);
+    // The row must be 'claiming' before the queue can send: the record written right before a
+    // send updates that row, and finding none must stop the send, not pass unnoticed.
+    this.claimTxDict[claimInfo.session] = claimInfo; // keeps the race guard across the await
+    try {
+      await ServiceManager.GetService(FaucetDatabase).updateSession(sessionData);
+    } catch(ex) {
+      delete this.claimTxDict[claimInfo.session];
+      sessionData.status = FaucetSessionStatus.CLAIMABLE;
+      sessionData.claim = null;
+      throw new FaucetError("INTERNAL_ERROR", "claimSession failed: could not record the claim: " + ex.toString());
+    }
 
     this.claimTxQueue.push(claimInfo);
-    this.claimTxDict[claimInfo.session] = claimInfo;
     return claimInfo;
   }
 
@@ -291,7 +328,8 @@ export class EthClaimManager {
 
         let claimTx = this.claimTxQueue.splice(0, 1)[0];
         this.lastProcessedClaimTxIdx = claimTx.claim.claimIdx;
-        await this.processQueueTx(claimTx);
+        if(!await this.processQueueTx(claimTx))
+          break; // its record could not be written: retry with the next tick
       }
 
       let now = Math.floor(new Date().getTime() / 1000);
@@ -329,14 +367,15 @@ export class EthClaimManager {
     this.queueProcessing = false;
   }
 
-  private async processQueueTx(claimTx: EthClaimInfo) {
+  /** false when the claim went back to the queue unsent because its record could not be written */
+  private async processQueueTx(claimTx: EthClaimInfo): Promise<boolean> {
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     let walletState = ethWalletManager.getWalletState();
     if(!walletState.ready) {
       claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
       claimTx.claim.txError = "Network RPC is currently unreachable.";
       this.settleClaim(claimTx);
-      return;
+      return true;
     }
     if(
       walletState.balance - BigInt(faucetConfig.spareFundsAmount) < BigInt(claimTx.amount) ||
@@ -345,14 +384,21 @@ export class EthClaimManager {
       claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
       claimTx.claim.txError = "Faucet wallet is out of funds.";
       this.settleClaim(claimTx);
-      return;
+      return true;
     }
 
     try {
       claimTx.claim.claimStatus = ClaimTxStatus.PROCESSING;
 
-      // send transaction
-      let { txPromise } = await ethWalletManager.sendClaimTx(claimTx);
+      // send transaction, once its signed form is on record
+      let { txPromise } = await ethWalletManager.sendClaimTx(claimTx, () => {
+        return ServiceManager.GetService(FaucetDatabase).updateClaimData(claimTx.session, claimTx.claim).then((written) => {
+          if(!written)
+            throw new ClaimNotPersistedError("no claiming row for the session");
+        }, (ex) => {
+          throw new ClaimNotPersistedError(ex);
+        });
+      });
       this.pendingTxQueue[claimTx.claim.txHash] = claimTx;
       
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Submitted claim transaction " + claimTx.session + " [" + ethWalletManager.readableAmount(BigInt(claimTx.amount)) + "] to: " + claimTx.target + ": " + claimTx.claim.txHash);
@@ -361,10 +407,20 @@ export class EthClaimManager {
 
       this.awaitTxReceipt(claimTx, txPromise);
     } catch(ex) {
+      if(ex instanceof ClaimNotPersistedError) {
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Claim " + claimTx.session + " not sent, its record could not be written: " + ex.cause);
+        claimTx.claim.claimStatus = ClaimTxStatus.QUEUE;
+        delete claimTx.claim.txHash;
+        delete claimTx.claim.txHex;
+        delete claimTx.claim.txNonce;
+        this.claimTxQueue.unshift(claimTx);
+        return false;
+      }
       claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
       claimTx.claim.txError = "Processing Exception: " + ex.toString();
       this.settleClaim(claimTx);
     }
+    return true;
   }
 
   private awaitTxReceipt(claimTx: EthClaimInfo, txPromise: Promise<{
