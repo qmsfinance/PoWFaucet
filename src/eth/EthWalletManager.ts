@@ -46,6 +46,21 @@ export interface TransactionResult {
   }>;
 }
 
+/**
+ * No receipt, and the wallet nonce has moved past the transaction's: another transaction took its
+ * nonce, so this one cannot be mined any more. It may still have been mined if a node lags.
+ */
+export class TransactionDroppedError extends Error {
+  public constructor(public readonly txHash: string, public readonly txNonce: number) {
+    super("no receipt for " + txHash + " while its nonce " + txNonce + " is spent");
+    this.name = "TransactionDroppedError";
+  }
+}
+
+// Polls in a row that must see the nonce spent with no receipt before a transaction is given up.
+// A debounce against nodes that disagree behind a load balancer, not a proof of replacement.
+const TX_DROPPED_POLLS = 3;
+
 export class EthWalletManager {
 
   public static getWeb3Provider(rpcHost: any): any {
@@ -473,14 +488,21 @@ export class EthWalletManager {
   */
 
   private async awaitTransactionReceipt(txhash: string, txnonce: number): Promise<TransactionReceipt> {
-
+    let nonceSpentPolls = 0;
     while(true) {
-      let receipt: TransactionReceipt;
       try {
         return await this.web3.eth.getTransactionReceipt(txhash);
       } catch(ex) {
-        if(ex instanceof TransactionNotFound || ex.toString().match(/CONNECTION ERROR/) || ex.toString().match(/invalid json response/)) {
-          // just retry when RPC connection issue
+        // web3 reports a null receipt as TransactionNotFound: only that one is an absence, any
+        // other error says nothing about the transaction and must not count towards dropping it
+        if(ex instanceof TransactionNotFound) {
+          if(nonceSpentPolls >= TX_DROPPED_POLLS)
+            throw new TransactionDroppedError(txhash, txnonce); // still absent after the nonce read
+          nonceSpentPolls = await this.isNonceSpent(txnonce) ? nonceSpentPolls + 1 : 0;
+          if(nonceSpentPolls >= TX_DROPPED_POLLS)
+            continue; // poll the receipt once more, now that the nonce is seen spent
+        } else if(ex.toString().match(/CONNECTION ERROR/) || ex.toString().match(/invalid json response/)) {
+          nonceSpentPolls = 0; // just retry when RPC connection issue
         } else {
           ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Error while polling transaction receipt for " + txhash + ": " + ex.toString());
           console.log("err ", ex);
@@ -492,4 +514,13 @@ export class EthWalletManager {
     }
   }
 
+  private async isNonceSpent(txnonce: number): Promise<boolean> {
+    if(typeof txnonce !== "number")
+      return false;
+    try {
+      return BigInt(await this.web3.eth.getTransactionCount(this.walletAddr, "latest")) > BigInt(txnonce);
+    } catch(ex) {
+      return false;
+    }
+  }
 }

@@ -2,7 +2,7 @@ import { WebSocket } from 'ws';
 import { faucetConfig } from "../config/FaucetConfig.js";
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
 import { ServiceManager } from "../common/ServiceManager.js";
-import { EthWalletManager } from "./EthWalletManager.js";
+import { EthWalletManager, TransactionDroppedError } from "./EthWalletManager.js";
 import { FaucetStatsLog } from "../services/FaucetStatsLog.js";
 import { FaucetDatabase } from "../db/FaucetDatabase.js";
 import { EthWalletRefill } from "./EthWalletRefill.js";
@@ -55,6 +55,8 @@ export interface EthClaimData {
   txBlock?: number;
   txFee?: string;
   txError?: string;
+  /** earlier transactions of this claim, given up with their nonce spent by another */
+  droppedTxs?: {hash: string, nonce: number}[];
 }
 
 export class EthClaimManager {
@@ -290,7 +292,7 @@ export class EthClaimManager {
         }
 
         let claimTx = this.claimTxQueue.splice(0, 1)[0];
-        this.lastProcessedClaimTxIdx = claimTx.claim.claimIdx;
+        this.lastProcessedClaimTxIdx = Math.max(this.lastProcessedClaimTxIdx, claimTx.claim.claimIdx); // a requeued claim is older
         await this.processQueueTx(claimTx);
       }
 
@@ -385,12 +387,18 @@ export class EthClaimManager {
       claimTx.claim.claimStatus = ClaimTxStatus.CONFIRMED;
       this.settleClaim(claimTx);
     }).catch((error) => {
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + claimTx.target + " failed: " + error.toString());
       delete this.pendingTxQueue[claimTx.claim.txHash];
+      if(error instanceof TransactionDroppedError) {
+        this.requeueDroppedClaim(claimTx, error);
+        return;
+      }
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + claimTx.target + " failed: " + error.toString());
       claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
       claimTx.claim.txError = "Transaction Error: " + error.toString();
       this.settleClaim(claimTx);
     }).then(() => {
+      if(claimTx.claim.claimStatus === ClaimTxStatus.QUEUE)
+        return; // requeued: it has no transaction to remember yet
       this.historyTxDict[claimTx.claim.txNonce] = claimTx;
       setTimeout(() => {
         delete this.historyTxDict[claimTx.claim.txNonce];
@@ -398,4 +406,21 @@ export class EthClaimManager {
     });
   }
 
+  /**
+   * A claim whose transaction was dropped goes back in the queue, to be sent again under a new nonce.
+   * Do not settle it as failed (unpaid) or confirmed (the UI then says the tokens arrived): a second
+   * payout, when a lagging node hid the receipt, is the accepted cost.
+   */
+  private requeueDroppedClaim(claimTx: EthClaimInfo, error: TransactionDroppedError) {
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + claimTx.target + " dropped, claim " + claimTx.session + " queued again: " + error.message);
+    claimTx.claim.droppedTxs = (claimTx.claim.droppedTxs || []).concat([{hash: error.txHash, nonce: error.txNonce}]);
+    claimTx.claim.claimStatus = ClaimTxStatus.QUEUE;
+    delete claimTx.claim.txHash;
+    delete claimTx.claim.txHex;
+    delete claimTx.claim.txNonce;
+    delete claimTx.claim.txFee;
+    let pos = this.claimTxQueue.findIndex((queued) => queued.claim.claimIdx > claimTx.claim.claimIdx);
+    this.claimTxQueue.splice(pos === -1 ? this.claimTxQueue.length : pos, 0, claimTx);
+    this.updateClaimStatus(claimTx);
+  }
 }

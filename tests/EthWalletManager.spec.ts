@@ -728,4 +728,150 @@ describe("ETH Wallet Manager", () => {
     expect(walletState.balance).equal(999999998663n, "unexpected balance in wallet state");
     expect(walletState.nativeBalance).equal(999979000000000000n, "unexpected balance in wallet state");
   });
+
+  describe("dropped claim transactions", () => {
+    const droppedHash = "0x1337b2933e4d908d44948ae7f8ec3184be10bbd67ba3c4b165be654281330001";
+
+    function receiptOf(hash: string): any {
+      return {
+        "blockHash": "0xfce202c4104864d81d8bd78b7202a77e5dca634914a3fd6636f2765d65fa9a07",
+        "blockNumber": "0x8aa5ae",
+        "contractAddress": null,
+        "cumulativeGasUsed": "0x1752665",
+        "effectiveGasPrice": "0x3b9aca00",
+        "from": "0x917c0A57A0FaA917f8ac7cA8Dd52db0b906a59d2",
+        "gasUsed": "0x5208",
+        "logs": [],
+        "logsBloom": "0x" + "0".repeat(512),
+        "status": "0x1",
+        "to": "0x0000000000000000000000000000000000001337",
+        "transactionHash": hash,
+        "transactionIndex": "0x3d",
+        "type": "0x2"
+      };
+    }
+
+    // the wallet sits at nonce 42; the first transaction sent gets droppedHash, later ones their own
+    async function setupWallet(opts: {
+      latestNonce: () => number,
+      receipt?: (hash: string) => any,
+    }) {
+      faucetConfig.ethChainId = 1337;
+      faucetConfig.spareFundsAmount = 0;
+      faucetConfig.ethTxGasLimit = 21000;
+      faucetConfig.ethTxMaxFee = 100000000000;
+      faucetConfig.ethTxPrioFee = 2000000000;
+      faucetConfig.minDropAmount = 1000;
+      faucetConfig.ethQueueNoFunds = true;
+      let ethWalletManager = ServiceManager.GetService(EthWalletManager);
+      let ethClaimManager = ServiceManager.GetService(EthClaimManager);
+      let state = { pendingNonce: 42, sent: [] as {hash: string, nonce: number}[] };
+      fakeProvider.injectResponse("eth_blockNumber", "0x1000");
+      fakeProvider.injectResponse("eth_getBalance", "1000000000000000000");
+      fakeProvider.injectResponse("eth_getTransactionCount", (payload) => payload.params[1] === "pending" ? state.pendingNonce : opts.latestNonce());
+      fakeProvider.injectResponse("eth_sendRawTransaction", (payload) => {
+        let hash = state.sent.length === 0 ? droppedHash : "0x" + (state.sent.length + 1).toString(16).padStart(64, "0");
+        state.sent.push({hash: hash, nonce: ethWalletManager.getWalletState().nonce});
+        return hash;
+      });
+      fakeProvider.injectResponse("eth_getTransactionReceipt", (payload) => {
+        let hash = payload.params[0];
+        if(opts.receipt)
+          return opts.receipt(hash);
+        return hash === droppedHash ? null : receiptOf(hash);
+      });
+      await ethWalletManager.initialize();
+      (ethWalletManager as any).txReceiptPollInterval = 50;
+      await ethWalletManager.loadWalletState();
+      return { ethWalletManager, ethClaimManager, state };
+    }
+
+    function newSession(id: string): FaucetSessionStoreData {
+      return {
+        sessionId: id,
+        status: FaucetSessionStatus.CLAIMABLE,
+        startTime: Math.floor(new Date().getTime() / 1000),
+        targetAddr: "0x0000000000000000000000000000000000001337",
+        dropAmount: "1337",
+        remoteIP: "8.8.8.8",
+        tasks: [], data: {}, claim: null,
+      };
+    }
+
+    async function runQueue(claimManager: EthClaimManager, ms: number, until: () => boolean) {
+      let end = Date.now() + ms;
+      while(Date.now() < end && !until()) {
+        await claimManager.processQueue();
+        await sleepPromise(25);
+      }
+    }
+
+    it("a pending transaction whose nonce another took is sent again, and the queue it held up drains", async () => {
+      let latest = 42;
+      let { ethWalletManager, ethClaimManager, state } = await setupWallet({ latestNonce: () => latest });
+      let claimA = await ethClaimManager.createSessionClaim(newSession("f081154a-3b93-4972-9ae7-b83f3307bb01"), {});
+      await ethClaimManager.processQueue();
+      expect(claimA.claim.claimStatus).to.equal(ClaimTxStatus.PENDING);
+      expect(claimA.claim.txHash).to.equal(droppedHash);
+
+      // the incident: another transaction took nonce 42, and a failed reload left the wallet not ready,
+      // which the queue only reloads once nothing is pending
+      latest = 43;
+      state.pendingNonce = 43;
+      (ethWalletManager as any).walletState.ready = false;
+      (ethWalletManager as any).lastWalletRefresh = 0;
+      let claimB = await ethClaimManager.createSessionClaim(newSession("f081154a-3b93-4972-9ae7-b83f3307bb02"), {});
+
+      await runQueue(ethClaimManager, 4000, () => claimA.claim.claimStatus === ClaimTxStatus.CONFIRMED && claimB.claim.claimStatus === ClaimTxStatus.CONFIRMED);
+      expect(claimA.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED, "dropped claim not paid again");
+      expect(claimB.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED, "queue still held up");
+      expect(claimA.claim.droppedTxs).to.deep.equal([{hash: droppedHash, nonce: 42}]);
+      expect(claimA.claim.txHash).to.not.equal(droppedHash);
+      expect(state.sent.map((tx) => tx.nonce)).to.deep.equal([42, 43, 44], "unexpected nonces");
+    }).timeout(10000);
+
+    it("a pending transaction whose nonce is still free stays pending", async () => {
+      let { ethClaimManager, state } = await setupWallet({ latestNonce: () => 42 });
+      let claim = await ethClaimManager.createSessionClaim(newSession("f081154a-3b93-4972-9ae7-b83f3307bb03"), {});
+      await runQueue(ethClaimManager, 1000, () => false);
+      expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.PENDING);
+      expect(state.sent.length).to.equal(1);
+    }).timeout(5000);
+
+    it("nodes that disagree on the nonce never add up to a dropped transaction", async () => {
+      let reads = 0;
+      let { ethClaimManager, state } = await setupWallet({ latestNonce: () => (reads++ % 3 === 2) ? 42 : 43 });
+      let claim = await ethClaimManager.createSessionClaim(newSession("f081154a-3b93-4972-9ae7-b83f3307bb04"), {});
+      await runQueue(ethClaimManager, 1000, () => false);
+      expect(reads).to.be.greaterThan(6, "too few polls to mean anything");
+      expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.PENDING);
+      expect(state.sent.length).to.equal(1);
+    }).timeout(5000);
+
+    it("connection errors between polls never add up to a dropped transaction", async () => {
+      let receiptReads = 0;
+      let { ethClaimManager, state } = await setupWallet({
+        latestNonce: () => 43,
+        receipt: (hash) => (receiptReads++ % 3 === 2) ? { _throw: new FetchError("invalid json response", "invalid-json") } : null,
+      });
+      let claim = await ethClaimManager.createSessionClaim(newSession("f081154a-3b93-4972-9ae7-b83f3307bb05"), {});
+      await runQueue(ethClaimManager, 1000, () => false);
+      expect(receiptReads).to.be.greaterThan(6, "too few polls to mean anything");
+      expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.PENDING);
+      expect(state.sent.length).to.equal(1);
+    }).timeout(5000);
+
+    it("a receipt that shows up on the last poll confirms the claim instead", async () => {
+      let receiptReads = 0;
+      let { ethClaimManager, state } = await setupWallet({
+        latestNonce: () => 43,
+        receipt: (hash) => ++receiptReads > 3 ? receiptOf(hash) : null,
+      });
+      let claim = await ethClaimManager.createSessionClaim(newSession("f081154a-3b93-4972-9ae7-b83f3307bb06"), {});
+      await runQueue(ethClaimManager, 2000, () => claim.claim.claimStatus === ClaimTxStatus.CONFIRMED);
+      expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED);
+      expect(claim.claim.droppedTxs).to.equal(undefined);
+      expect(state.sent.length).to.equal(1);
+    }).timeout(5000);
+  });
 });

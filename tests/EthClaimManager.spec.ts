@@ -11,7 +11,7 @@ import { FaucetError } from '../src/common/FaucetError.js';
 import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData } from '../src/session/FaucetSession.js';
 import { ClaimTxStatus, EthClaimInfo, EthClaimManager } from '../src/eth/EthClaimManager.js';
 import { getNewGuid } from '../src/utils/GuidUtils.js';
-import { EthWalletManager, TransactionResult } from '../src/eth/EthWalletManager.js';
+import { EthWalletManager, TransactionDroppedError, TransactionResult } from '../src/eth/EthWalletManager.js';
 import { sleepPromise } from '../src/utils/PromiseUtils.js';
 import { FakeWebSocket, injectFakeWebSocket } from './stubs/FakeWebSocket.js';
 import { EthClaimNotificationClient } from '../src/eth/EthClaimNotificationClient.js';
@@ -171,6 +171,43 @@ describe("ETH Claim Manager", () => {
     let claim3 = claimManager.getTransactionQueue().filter(t => t.session === ses3.sessionId)[0];
     await awaitSleepPromise(500, () => claim3?.claim.claimStatus === ClaimTxStatus.FAILED);
     expect(claim3?.claim.claimStatus).to.equal(ClaimTxStatus.FAILED, "unexpected ses3 claim status");
+  });
+
+  it("A dropped transaction's claim is queued again, and a restart restores it queued", async () => {
+    let txHash = "0x7c4074c4d182e312adf698795835cbd2d597246cdd47013f09c7bb81f33a3609";
+    let ses = await addTestSession(FaucetSessionStatus.CLAIMING, {
+      claimIdx: 4,
+      claimStatus: ClaimTxStatus.PENDING,
+      claimTime: Math.floor(new Date().getTime() / 1000),
+      txHash: txHash,
+      txNonce: 472999,
+    });
+    globalStubs["watchClaimTx"] = sinon.stub(EthWalletManager.prototype, "watchClaimTx").returns(Promise.reject(new TransactionDroppedError(txHash, 472999)));
+
+    let claimManager = ServiceManager.GetService(EthClaimManager);
+    await claimManager.initialize();
+    let db = ServiceManager.GetService(FaucetDatabase);
+    await awaitSleepPromise(1000, () => claimManager.getTransactionQueue(true).length === 1);
+    let queued = claimManager.getTransactionQueue(true);
+    expect(queued.length).to.equal(1, "claim not queued again");
+    expect(queued[0].claim.claimStatus).to.equal(ClaimTxStatus.QUEUE);
+    expect(queued[0].claim.txHash).to.equal(undefined);
+    expect(claimManager.isClaimSettled(ses.sessionId)).to.equal(false, "a requeued claim is not settled");
+
+    let row: FaucetSessionStoreData;
+    for(let i = 0; i < 100 && (row = await db.getSession(ses.sessionId))?.claim?.claimStatus !== ClaimTxStatus.QUEUE; i++)
+      await sleepPromise(10);
+    expect(row.status).to.equal(FaucetSessionStatus.CLAIMING);
+    expect(row.claim.claimStatus).to.equal(ClaimTxStatus.QUEUE);
+    expect(row.claim.droppedTxs).to.deep.equal([{hash: txHash, nonce: 472999}]);
+
+    claimManager.dispose();
+    let restarted = new EthClaimManager();
+    await restarted.initialize();
+    let restored = restarted.getTransactionQueue(true);
+    expect(restored.length).to.equal(1, "requeued claim not restored");
+    expect(restored[0].session).to.equal(ses.sessionId);
+    restarted.dispose();
   });
 
   it("Create session claim, Invalid: session not claimable", async () => {
