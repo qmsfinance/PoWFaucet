@@ -4,7 +4,8 @@
 > [pk910/PoWFaucet](https://github.com/pk910/PoWFaucet), maintained by QMS since
 > 2026-09-28. Branch `qms` is the **upstream base**, upstream's release tag `v2.6.0`, plus
 > the **QMS patch stack**: our commits on top, one per change, re-applied at every move to a
-> new base. `git log v2.6.0..qms` is the whole patch stack.
+> new base. `git log v2.6.0..qms` is the whole patch stack. Base plus patch stack is the
+> **QMS release**: the image built from `qms`, named by its commit sha.
 >
 > - **Upstreamable** patches, to propose upstream: the database connection
 >   (`FAUCET_DB_HOST` / `FAUCET_DB_PASSWORD` overrides, optional MySQL TLS), relative
