@@ -30,7 +30,7 @@ services:
       REQUEST_AMOUNT: "4"
       REQUEST_CIRCLE: "24"
     volumes:
-      - ./faucet-config.yaml:/data/faucet-config.yaml:ro
+      - ./e2e-config.yaml:/data/faucet-config.yaml:ro
     tmpfs: ["/data/tmp"]
     ports: ["18080:8080"]
     depends_on:
