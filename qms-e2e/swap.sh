@@ -21,11 +21,15 @@ done
 sleep 8
 echo "OLD signed: pool $(cast_ rpc txpool_status | jq -c .), queue $(curl -s $API/getQueueStatus | jq -c '[.claims[].status]|group_by(.)|map({(.[0]):length})|add')"
 IMG="$OLD" dc stop faucet > /dev/null 2>&1
-cast_ rpc anvil_dropAllTransactions > /dev/null; echo "all txs dropped: pool $(cast_ rpc txpool_status | jq -c .), chain nonce $(cast_ nonce $FAUCET)"
+cast_ rpc anvil_dropAllTransactions > /dev/null || { echo "FAIL: could not drop the pool"; exit 1; }
+[ "$(cast_ nonce $FAUCET)" = 0 ] || { echo "FAIL: payouts were mined before the swap, nothing left to recover"; exit 1; }
+echo "all txs dropped: pool $(cast_ rpc txpool_status | jq -c .), chain nonce $(cast_ nonce $FAUCET)"
 dc exec -T mysql mysql -ufaucet -pfaucetpw faucet -N -e "select Status, JSON_EXTRACT(ClaimData,'$.claimStatus') s, count(*) from Sessions group by 1,2" 2>/dev/null < /dev/null
 up "$NEW"; echo "NEW up on the same DB"
 for t in $(seq 1 30); do cast_ rpc evm_mine > /dev/null; sleep 3; done
 echo "== chain nonce $(cast_ nonce $FAUCET) (5 = all paid)"
-paid=0; while read -r a; do [ "$(cast_ balance "$a")" != 0 ] && paid=$((paid+1)); done < addrs.txt; echo "recipients paid: $paid/5"
+paid=0; while read -r a; do [ "$(cast_ balance "$a")" = 10000000000000000000 ] && paid=$((paid+1)); done < addrs.txt; echo "recipients paid exactly once: $paid/5"
 dc exec -T mysql mysql -ufaucet -pfaucetpw faucet -N -e "select Status, JSON_EXTRACT(ClaimData,'$.claimStatus'), JSON_EXTRACT(ClaimData,'$.txNonce') from Sessions order by TargetAddr; select * from SchemaVersion" 2>/dev/null < /dev/null
 IMG="$NEW" dc logs faucet 2>&1 | grep -E 'WARN|ERROR|re-?send|unknown|giving|Schema|upgrade' | grep -v nginx | sed -E 's/^faucet-[^|]*\| //' | cut -c1-170 | tail -6
+[ "$(cast_ nonce $FAUCET)" = 5 ] && [ "$paid" = 5 ] || { echo "FAIL"; exit 1; }
+echo "PASS"
