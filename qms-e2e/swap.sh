@@ -8,6 +8,11 @@ API=http://localhost:18080/api
 FAUCET=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 dc() { FAUCET_IMAGE="${IMG:-$OLD}" docker compose "$@"; }
 cast_() { dc exec -T anvil cast "$@" --rpc-url http://localhost:8545 < /dev/null; }
+pending() { # the pool's pending count; exits the run if the RPC gave no number
+  local h; h=$(cast_ rpc txpool_status | jq -r .pending 2> /dev/null)
+  [[ "$h" =~ ^0x[0-9a-fA-F]+$ ]] || { echo "FAIL: txpool_status unreadable: '$h'"; exit 1; }
+  printf '%d' "$h"
+}
 up() { IMG="$1" dc up -d --force-recreate faucet > /dev/null 2>&1; for _ in $(seq 60); do curl -sf $API/getFaucetConfig > /dev/null && return; sleep 2; done; echo "faucet $1 did not come up"; exit 1; }
 dc down -v > /dev/null 2>&1; dc up -d anvil proxy mysql > /dev/null 2>&1
 up "$OLD"
@@ -21,9 +26,9 @@ done
 sleep 8
 echo "OLD signed: pool $(cast_ rpc txpool_status | jq -c .), queue $(curl -s $API/getQueueStatus | jq -c '[.claims[].status]|group_by(.)|map({(.[0]):length})|add')"
 IMG="$OLD" dc stop faucet > /dev/null 2>&1
-[ "$(printf '%d' "$(cast_ rpc txpool_status | jq -r .pending)")" -ge 3 ] || { echo "FAIL: OLD left nothing in the pool to lose"; exit 1; }
+n=$(pending) || exit 1; [ "$n" -ge 3 ] || { echo "FAIL: OLD left nothing in the pool to lose"; exit 1; }
 cast_ rpc anvil_dropAllTransactions > /dev/null || { echo "FAIL: could not drop the pool"; exit 1; }
-[ "$(printf '%d' "$(cast_ rpc txpool_status | jq -r .pending)")" = 0 ] || { echo "FAIL: the pool still holds transactions after the drop"; exit 1; }
+n=$(pending) || exit 1; [ "$n" = 0 ] || { echo "FAIL: the pool still holds transactions after the drop"; exit 1; }
 [ "$(cast_ nonce $FAUCET)" = 0 ] || { echo "FAIL: payouts were mined before the swap, nothing left to recover"; exit 1; }
 echo "all txs dropped: pool $(cast_ rpc txpool_status | jq -c .), chain nonce $(cast_ nonce $FAUCET)"
 dc exec -T mysql mysql -ufaucet -pfaucetpw faucet -N -e "select Status, JSON_EXTRACT(ClaimData,'$.claimStatus') s, count(*) from Sessions group by 1,2" 2>/dev/null < /dev/null
