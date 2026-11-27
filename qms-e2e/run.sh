@@ -35,11 +35,16 @@ if [ "$MODE" = fresh ]; then
     echo "claim $i: session $st, claim $(jq -r '.status // .error // .' <<< "$c" | head -c 80)"
   done
   for _ in $(seq 30); do [ "$(pending)" -ge 3 ] && break; sleep 1; done
+  [ "$(pending)" -ge 3 ] || { echo "FAIL: the window never filled: $(pool)"; exit 1; }
   echo "pool before the fault: $(pool)  (window ethMaxPending=3)"
   low=$(cast_ rpc txpool_content | jq -r --arg f "$(tr A-F a-f <<< $FAUCET)" '.pending | to_entries[] | select((.key|ascii_downcase)==$f) | .value | to_entries | min_by(.key|tonumber) | .value.hash')
-  cast_ rpc anvil_dropTransaction "$low" > /dev/null && echo "dropped lowest in-flight tx $low"
+  cast_ rpc anvil_dropTransaction "$low" > /dev/null || { echo "FAIL: could not drop $low"; exit 1; }
+  echo "dropped lowest in-flight tx $low"
   echo "pool after drop: $(pool)"
-  dc stop proxy > /dev/null 2>&1; echo "RPC down"; sleep 25; dc start proxy > /dev/null 2>&1; echo "RPC back"
+  dc stop proxy > /dev/null 2>&1 || { echo "FAIL: could not stop the proxy"; exit 1; }
+  echo "RPC down"; sleep 25
+  dc start proxy > /dev/null 2>&1 || { echo "FAIL: could not start the proxy"; exit 1; }
+  echo "RPC back"
 fi
 
 for t in $(seq 1 45); do
@@ -48,8 +53,10 @@ for t in $(seq 1 45); do
   [ $((t % 9)) = 0 ] && echo "t=$((t*3))s chain nonce $(nonce) pool $(pool)"
 done
 echo "== result: chain nonce $(nonce) (5 = every claim paid)"
-paid=0; while read -r a; do b=$(cast_ balance "$a"); [ "$b" != 0 ] && paid=$((paid+1)); done < addrs.txt
-echo "recipients paid: $paid/5"
+paid=0; while read -r a; do b=$(cast_ balance "$a"); [ "$b" = 10000000000000000000 ] && paid=$((paid+1)); done < addrs.txt
+echo "recipients paid exactly once: $paid/5"
 curl -s $API/getQueueStatus | jq -c '[.claims[].status] | group_by(.) | map({(.[0]): length}) | add'
 dc logs faucet 2>&1 | grep -E 'WARN|ERROR|dropped|unknown|re-send|resend|giving' | grep -v nginx | sed -E 's/^faucet-[^|]*\| //' | cut -c1-170 | tail -8
 dc exec -T mysql mysql -ufaucet -pfaucetpw faucet -N -e "select Status, JSON_EXTRACT(ClaimData,'$.claimStatus'), JSON_EXTRACT(ClaimData,'$.txNonce'), TargetAddr from Sessions order by TargetAddr" 2>/dev/null < /dev/null
+[ "$(nonce)" = 5 ] && [ "$paid" = 5 ] || { echo "FAIL"; exit 1; }
+echo "PASS"
