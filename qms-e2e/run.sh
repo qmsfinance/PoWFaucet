@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One arm of the net3 stall rehearsal against FAUCET_IMAGE.
+# One arm of the payout-recovery rehearsal against FAUCET_IMAGE.
 #   run.sh <image> fresh      new DB, 5 claims, lowest in-flight tx dropped + RPC down 25 s, then mining
 #   run.sh <image> resume     same DB and chain, just start this image and keep mining (image swap)
 set -uo pipefail

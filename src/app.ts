@@ -70,8 +70,8 @@ import { checkModules } from "./tools/checkModules.js";
     await ServiceManager.GetService(EthClaimManager).initialize();
     ServiceManager.GetService(FaucetHttpServer).initialize();
 
-    // The operator key is not logged: these logs are shipped to a store more people read than
-    // should see users' IPs. Derive it from the faucet secret instead (sha256(secret + "-unmasked")).
+    // The operator key is not logged: it unmasks users' IPs, and logs reach more readers than that
+    // warrants. Derive it from the faucet secret instead (sha256(secret + "-unmasked")).
     ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Faucet initialization complete.");
   } catch(ex) {
     ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Faucet initialization failed: " + ex.toString() + " " + ex.stack);
