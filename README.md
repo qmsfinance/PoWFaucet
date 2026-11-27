@@ -5,8 +5,10 @@
 > 2026-09-28. Changes: the UI (`faucet-client/`, `static/`), its runtime network preset
 > (see *Frontend runtime configuration* below), and the image pipeline
 > (`.github/workflows/qms-faucet-image.yml`). The server and its modules are upstream's,
-> except for the database connection: `FAUCET_DB_HOST` / `FAUCET_DB_PASSWORD` overrides and
-> optional MySQL TLS. Branch `qms` is upstream plus these changes, one commit each.
+> except for the database connection (`FAUCET_DB_HOST` / `FAUCET_DB_PASSWORD` overrides,
+> optional MySQL TLS), relative redirects in the image's nginx, and a startup log without the
+> operator key. Branch `qms` is upstream's release tag `v2.6.0` plus these changes, one commit each:
+> `git log v2.6.0..qms` is the whole of what we carry.
 > It is the source of the faucets QMS runs, offered to their users under AGPL-3.0 §13.
 
 <img src="https://faucets.pk910.de/images/logo-cat-small.png" height="90px" />
