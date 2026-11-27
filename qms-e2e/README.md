@@ -1,8 +1,8 @@
 # qms-e2e
 
-Rehearsal of the faucet's payout queue under the failure that stalled net3 on 2026-11-27:
-in-flight payouts lost from the pool while the RPC is unreachable. Run it before moving `qms`
-to a new upstream base, with the image being shipped and the one it replaces.
+Rehearsal of the faucet's payout queue when in-flight payouts are lost from the pool while the
+RPC is unreachable. Run it before moving `qms` to a new upstream base, with the image being
+shipped and the one it replaces.
 
 Needs docker. anvil mines only on request, so the pool and the nonce are under the script's control.
 
