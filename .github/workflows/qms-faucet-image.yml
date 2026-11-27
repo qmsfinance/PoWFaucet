@@ -12,7 +12,7 @@ name: qms-faucet-image
 # ECR only, no GHCR: nothing pulls this image from a second registry.
 on:
   push:
-    branches: [master]
+    branches: [qms]
   workflow_dispatch:
 
 permissions:
@@ -96,7 +96,7 @@ jobs:
       # `actions: write` only — the commit is made by argocd-nonprod's own GITHUB_TOKEN,
       # so no token that can write content to that repo exists here.
       - name: Mint an installation token for qmsfinance/argocd-nonprod
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/qms'
         id: deploy
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -107,7 +107,7 @@ jobs:
           permission-actions: write
 
       - name: Announce the tag to argocd-nonprod
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/qms'
         env:
           GH_TOKEN: ${{ steps.deploy.outputs.token }}
           TAG: ${{ steps.build.outputs.tag }}
