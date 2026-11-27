@@ -86,66 +86,10 @@ html.powfaucet, html.powfaucet body {
   background-color: #070812;
 }
 
-@media screen and (max-width: 480px) {
-  .faucet-container {
-    margin: 12px 8px;
-    padding: 16px;
-  }
-}
-
 // ---------------------------------------------------------------------------------------------
-// bootstrap 5.3, themed through its variables and emitted under the scope
+// bootstrap 5.3 on its default variables, emitted under the scope
 
 @import "bootstrap/scss/functions";
-
-$primary: #2a78d6;
-// bootstrap picks black text on a background whose contrast with white is below this; the
-// accent blue is just under its 4.5 default, and the landing page sets it in white
-$min-contrast-ratio: 3;
-$secondary: #6c757d;
-$success: #198754;
-$danger: #dc3545;
-$warning: #e0a800;
-$info: #2a78d6;
-$body-bg: #ffffff;
-$body-color: #212529;
-$body-secondary-color: #6c757d;
-$font-family-sans-serif: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-$font-size-base: 0.9375rem; // 15px
-$headings-font-weight: 700;
-$border-color: rgba(0, 0, 0, 0.08);
-$border-radius: 0.75rem;      // 12px: controls
-$border-radius-sm: 0.625rem;  // 10px: tiles, alerts
-$border-radius-lg: 1.25rem;   // 20px: cards, dialogs
-$border-radius-xl: 1.25rem;
-$btn-font-weight: 600;
-$btn-padding-y: 0.7rem;
-$btn-padding-x: 1rem;
-$btn-border-radius: $border-radius;
-$btn-border-radius-sm: 999px;
-$input-padding-y: 0.7rem;
-$input-padding-x: 0.875rem;
-$input-border-color: rgba(0, 0, 0, 0.18);
-$input-border-radius: $border-radius;
-$card-border-radius: $border-radius-lg;
-$card-border-color: rgba(0, 0, 0, 0.08);
-$modal-content-border-radius: $border-radius-lg;
-$modal-content-border-color: rgba(0, 0, 0, 0.08);
-$alert-border-radius: $border-radius-sm;
-$alert-padding-y: 0.625rem;
-$alert-padding-x: 0.875rem;
-$badge-border-radius: 999px;
-$badge-font-weight: 600;
-$badge-padding-y: 0.3em;
-$badge-padding-x: 0.65em;
-$tooltip-border-radius: 0.5rem;
-$tooltip-max-width: 320px;
-$table-cell-padding-y: 0.125rem;
-$table-cell-padding-x: 0.5rem;
-$link-decoration: none;
-$link-hover-decoration: underline;
-$enable-shadows: false;
-$enable-dark-mode: false;
 
 @import "bootstrap/scss/variables";
 @import "bootstrap/scss/variables-dark";
@@ -153,11 +97,15 @@ $enable-dark-mode: false;
 @import "bootstrap/scss/mixins";
 @import "bootstrap/scss/utilities";
 
-.faucet-bootstrap {
-  // `:root` becomes `.faucet-bootstrap :root` (never matches) and `[data-bs-theme=light]`
-  // becomes `.faucet-bootstrap [data-bs-theme=light]`, which is the `.faucet-page` element
+// root and reboot under `:where()`: scoped like the rest, at an element selector's weight, so the
+// QMS theme's single-class rules still win over them.
+:where(.faucet-bootstrap) {
+  // `:root` never matches here and `[data-bs-theme=light]` is the `.faucet-page` element
   @import "bootstrap/scss/root";
   @import "bootstrap/scss/reboot";
+}
+
+.faucet-bootstrap {
   @import "bootstrap/scss/type";
   @import "bootstrap/scss/images";
   @import "bootstrap/scss/containers";
@@ -186,7 +134,7 @@ $enable-dark-mode: false;
 .faucet-page {
   color: var(--pf-ink);
   font-family: var(--pf-font);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.5;
 }
 
@@ -236,6 +184,8 @@ $enable-dark-mode: false;
   border-radius: var(--pf-radius-sm);
   background: var(--pf-surface-2);
   border: 1px solid var(--pf-border);
+  // the tile is light while the QMS page text is near-white: set its ink with its ground
+  color: var(--pf-ink);
 }
 .faucet-page .pf-stat > span { font-size: 12px; color: var(--pf-ink-3); }
 .faucet-page .pf-stat > b {
@@ -293,8 +243,6 @@ $enable-dark-mode: false;
   font-weight: 600;
   cursor: pointer;
 }
-.faucet-page .faucet-actions button.btn-success { box-shadow: 0 6px 16px -8px rgba(25, 135, 84, 0.7); }
-.faucet-page .faucet-actions button.btn-danger { box-shadow: 0 6px 16px -8px rgba(220, 53, 69, 0.7); }
 .faucet-page .faucet-actions button:disabled { cursor: wait; box-shadow: none; }
 .faucet-page .btn-ghost,
 .faucet-page .btn-secondary.action-btn {
@@ -446,19 +394,6 @@ $enable-dark-mode: false;
   margin: 0;
 }
 
-.faucet-page .faucet-status-alerts {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.faucet-page .faucet-status-alerts:empty { display: none; }
-.faucet-page .faucet-status-alerts .alert {
-  margin: 0;
-  font-size: 14px;
-}
-
 .faucet-page .faucet-notifications {
   position: fixed;
   bottom: 0;
@@ -470,27 +405,6 @@ $enable-dark-mode: false;
   min-width: 300px;
   box-shadow: var(--pf-shadow);
 }
-
-// the footer line sits under the card, not in it: absolutely placed below the container, which
-// reserves the room with its bottom margin
-.faucet-container {
-  position: relative;
-  margin-bottom: 56px;
-}
-.faucet-page .faucet-footer {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 10px 0 0 0;
-  padding: 0 4px;
-  font-size: 12px;
-  color: var(--pf-ink-3);
-}
-.faucet-page .faucet-footer a { color: var(--pf-ink-2); }
 
 // ---------------------------------------------------------------------------------------------
 // front page
@@ -598,7 +512,7 @@ $enable-dark-mode: false;
 }
 
 .faucet-page .faucet-captcha {
-  margin-top: 0;
+  margin-top: 8px;
 }
 .faucet-page .page-frontpage .faucet-captcha {
   text-align: center;
@@ -981,6 +895,14 @@ $enable-dark-mode: false;
 }
 
 .faucet-page .faucet-actions button {
+  width: 100%;
+  border: none;
+  padding: 15px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  cursor: pointer;
   background: #b0c4f0;
   border-radius: 10px;
   color: #070812;
