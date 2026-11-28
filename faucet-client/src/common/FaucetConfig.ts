@@ -1,6 +1,14 @@
+import type { DeployedNetwork } from './RuntimeConfig';
 import { PoWHashAlgo } from "../types/PoWMinerSrc";
 
+// Browser-local estimate; the backend remains authoritative for request limits.
+export const LOCAL_CLAIM_INTERVAL_SECONDS = 86400;
+
 export interface IFaucetConfig {
+  chainId?: string;
+  network?: DeployedNetwork;
+  requestAmount?: number;
+  requestCircle?: number;
   faucetTitle: string;
   faucetStatus: IFaucetStatus[];
   faucetImage: string;

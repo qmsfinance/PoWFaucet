@@ -117,6 +117,7 @@ export class FaucetCaptcha extends React.PureComponent<IFaucetCaptchaProps, IFau
       <HCaptcha 
         sitekey={this.props.faucetConfig.modules.captcha.siteKey} 
         onVerify={(token) => this.onTokenChange(token)}
+        onExpire={() => this.onTokenChange(null)}
         ref={(cap) => { this.hcapControl = cap; }} 
       />
     );
@@ -127,6 +128,7 @@ export class FaucetCaptcha extends React.PureComponent<IFaucetCaptchaProps, IFau
       <ReCAPTCHA
         sitekey={this.props.faucetConfig.modules.captcha.siteKey}
         onChange={(token) => this.onTokenChange(token)}
+        onExpired={() => this.onTokenChange(null)}
         ref={(cap) => { this.recapControl = cap; }}
       />
     );
@@ -137,6 +139,7 @@ export class FaucetCaptcha extends React.PureComponent<IFaucetCaptchaProps, IFau
       <Turnstile
         sitekey={this.props.faucetConfig.modules.captcha.siteKey}
         onVerify={(token) => this.onTokenChange(token)}
+        onExpire={() => this.onTokenChange(null)}
         onLoad={(widgetId) => { this.turnstileWidgetId = widgetId; }}
       />
     );

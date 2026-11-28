@@ -1,0 +1,37 @@
+name: faucet-e2e
+services:
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:v1.8.1
+    entrypoint: ["anvil", "--host", "0.0.0.0", "--port", "8545", "--chain-id", "31337", "--no-mining"]
+  proxy:
+    image: alpine/socat:1.8.0.1
+    command: ["TCP-LISTEN:8545,fork,reuseaddr", "TCP:anvil:8545"]
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: faucet
+      MYSQL_USER: faucet
+      MYSQL_PASSWORD: faucetpw
+    command: ["--innodb-buffer-pool-size=64M", "--performance-schema=OFF", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_bin"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-uroot", "-proot"]
+      interval: 3s
+      retries: 40
+  faucet:
+    image: ${FAUCET_IMAGE}
+    user: "10001:10001"
+    environment:
+      # anvil's well-known dev account 0: a public test key, never funded anywhere real
+      FAUCET_ETH_WALLET_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+      FAUCET_SECRET: "e2e-secret"
+      FAUCET_DB_PASSWORD: "faucetpw"
+      FAUCET_NETWORK: "devnet"
+      REQUEST_AMOUNT: "4"
+      REQUEST_CIRCLE: "24"
+    volumes:
+      - ./e2e-config.yaml:/data/faucet-config.yaml:ro
+    tmpfs: ["/data/tmp"]
+    ports: ["18080:8080"]
+    depends_on:
+      mysql: {condition: service_healthy}

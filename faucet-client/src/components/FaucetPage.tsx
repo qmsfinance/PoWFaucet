@@ -1,7 +1,8 @@
 import React, { ReactElement } from 'react';
-import { HashRouter as Router, Routes, Route, Link, useLocation } from "react-router";
+import { MemoryRouter as Router, Routes, Route, Link, useLocation } from "react-router";
 
 import { FaucetApi } from '../common/FaucetApi';
+import { getNetworkLabel } from '../common/RuntimeConfig';
 import { IFaucetConfig, IFaucetStatus } from '../common/FaucetConfig';
 import { IFaucetContext, IFaucetContextUrls, IPageHeader } from '../common/FaucetContext';
 import { FaucetNotification } from './shared/FaucetNotification';
@@ -18,6 +19,7 @@ import { getRoutes } from '../sdk/slots';
 import { publishFaucetConfig, publishFaucetContext } from '../sdk/sdk';
 import { emitHookSafe } from '../sdk/hooks';
 import { SlotOutlet } from '../sdk/SlotOutlet';
+import { markSplashShellReady } from './shared/SiteLoader';
 
 import './FaucetPage.scss'
 import { PoWMinerWorkerSrc, getPoWMinerDefaultSrc } from '../types/PoWMinerSrc';
@@ -202,20 +204,18 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
         initializing: false,
         faucetConfig: faucetConfig,
         faucetStatus: faucetConfig.faucetStatus,
+      }, () => {
+        document.body.classList.remove("powfaucet-booting");
+        markSplashShellReady();
       });
+    }).catch((error) => {
+      console.error("Could not preload faucet configuration and network details", error);
     });
   }
 
-	public render(): React.ReactElement<IFaucetPageProps> {
+	public render(): React.ReactElement<IFaucetPageProps> | null {
     if(this.state.initializing) {
-      return (
-        <div className="faucet-loading">
-          <div className="loading-spinner">
-            <img src={(this.pageContext.faucetUrls.imagesUrl || "/images") + "/spinner.gif"} className="spinner" />
-            <span className="spinner-text">Loading...</span>
-          </div>
-        </div>
-      );
+      return null;
     }
     return (
       <div className='faucet-page' data-bs-theme="light" ref={(ref) => {
@@ -223,14 +223,31 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
       }}>
         <FaucetConfigContext.Provider value={this.state.faucetConfig}>
           <FaucetPageContext.Provider value={this.pageContext}>
-            {this.renderTitle()}
+            <header className="qms-header">
+              <div className="qms-brand" aria-label="QMS Faucet">
+                <img src={(this.pageContext.faucetUrls.imagesUrl || "/images") + "/qms-mark.svg"} alt="" width="26" height="26" />
+                <strong>QMS</strong>
+                <span>{getNetworkLabel(this.state.faucetConfig.network)} Faucet</span>
+              </div>
+              <div className="qms-header__links">
+                <span className="faucet-status-link qms-network-status" onClick={() => this.onFaucetStatusClick()}>
+                  <img src={(this.pageContext.faucetUrls.imagesUrl || "/images") + "/qms-dot.svg"} alt="" width="6" height="6" />
+                  {this.state.faucetConfig.network?.chainName || 'Testnet'}
+                </span>
+              </div>
+            </header>
             <SlotOutlet slot="header" faucetConfig={this.state.faucetConfig} navigate={(path) => { location.hash = path; }} />
-            {this.renderStatusAlerts()}
-            <div className="faucet-body">
-              {this.props.children && (!Array.isArray(this.props.children) || this.props.children.length > 0) ? this.props.children :
-              <Router>
-                <PageHookObserver />
-                <Routes>
+            <main className="qms-main-grid">
+              <div className="qms-content-frame">
+                <div className="faucet-title">
+                  <h1>{this.state.faucetConfig.faucetTitle}</h1>
+                </div>
+                {this.renderStatusAlerts()}
+                <div className="faucet-body">
+                  {this.props.children && (!Array.isArray(this.props.children) || this.props.children.length > 0) ? this.props.children :
+                  <Router>
+                    <PageHookObserver />
+                    <Routes>
                   <Route
                     path='/'
                     element={(
@@ -282,17 +299,21 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
                         : <route.component />}
                     />
                   ))}
-                </Routes>
-              </Router>
-              }
-            </div>
+                    </Routes>
+                  </Router>
+                  }
+                </div>
+              </div>
+            </main>
             {this.renderDialogs()}
             {this.renderNotifications()}
             <SlotOutlet slot="footer" faucetConfig={this.state.faucetConfig} navigate={(path) => { location.hash = path; }} />
-            <div className='faucet-footer'>
-              <span className="faucet-client-version">PoWFaucet client v{FAUCET_CLIENT_VERSION}</span>
-              <a href="https://github.com/pk910/PoWFaucet" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
-            </div>
+            <footer className='faucet-footer'>
+              <div className="qms-footer__left">
+                <span>© {new Date().getFullYear()} QMS Network</span>
+              </div>
+              <a className="qms-footer__credit" href="https://github.com/qmsfinance/PoWFaucet" target="_blank" rel="noopener noreferrer">Powered by PoWFaucet · Source (AGPL-3.0)</a>
+            </footer>
           </FaucetPageContext.Provider>
         </FaucetConfigContext.Provider>
       </div>

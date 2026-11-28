@@ -3,7 +3,7 @@ name: Development Build
 
 on:
   pull_request:
-    branches: [ "master" ]
+    branches: [ "master", "qms" ]
   workflow_dispatch:
 
 # every action is pinned to a commit sha (dependabot moves the sha and the version comment); the

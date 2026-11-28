@@ -1,0 +1,28 @@
+version: 2
+database:
+  driver: "mysql"
+  host: "mysql"
+  username: "faucet"
+  database: "faucet"
+serverPort: 8080
+httpProxyCount: 1
+faucetTitle: "e2e faucet"
+faucetCoinSymbol: "QMS"
+faucetCoinType: "native"
+ethRpcHost: "http://proxy:8545"
+ethChainId: 31337
+ethTxExplorerLink: "http://localhost/tx/{txid}"
+ethLegacyTx: false
+ethTxGasLimit: 21000
+ethTxMaxFee: 500000000000
+ethTxPrioFee: 100000000
+ethMaxPending: 3
+ethQueueNoFunds: true
+maxDropAmount: 10000000000000000000
+minDropAmount: 1000000000000000000
+sessionTimeout: 86400
+modules:
+  concurrency-limit:
+    enabled: false
+  recurring-limits:
+    enabled: false

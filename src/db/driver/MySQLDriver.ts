@@ -1,4 +1,5 @@
 import mysql, { ResultSetHeader } from "mysql2";
+import awsSslProfiles from "aws-ssl-profiles";
 import { FaucetDbDriver } from "../FaucetDatabase.js";
 import { BaseDriver, BindValues, QueryResult, RunResult } from "./BaseDriver.js";
 
@@ -10,6 +11,9 @@ export interface IMySQLOptions {
   password: string;
   database: string;
   poolLimit?: number;
+  // true: verify the server against the system CAs. "aws-rds": against the RDS CA bundle,
+  // which the system store does not carry. Unset keeps plaintext.
+  ssl?: boolean | "aws-rds";
 }
 
 export class MySQLDriver extends BaseDriver<IMySQLOptions> {
@@ -24,6 +28,7 @@ export class MySQLDriver extends BaseDriver<IMySQLOptions> {
       user: options.username,
       password: options.password,
       database: options.database,
+      ssl: options.ssl === "aws-rds" ? awsSslProfiles : options.ssl ? {} : undefined,
     });
   }
   public override async close(): Promise<void> {

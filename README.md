@@ -1,4 +1,21 @@
 # PoWFaucet
+
+> **QMS modified version.** This repository is a modified version of
+> [pk910/PoWFaucet](https://github.com/pk910/PoWFaucet), maintained by QMS since
+> 2026-09-28. Branch `qms` is the **upstream base**, upstream's release tag `v2.6.0`, plus
+> the **QMS patch stack**: our commits on top, one per change, re-applied at every move to a
+> new base. `git log v2.6.0..qms` is the whole patch stack. Base plus patch stack is the
+> **QMS release**: the image built from `qms`, named by its commit sha.
+>
+> - **Upstreamable** patches, to propose upstream: the database connection
+>   (`FAUCET_DB_HOST` / `FAUCET_DB_PASSWORD` overrides, optional MySQL TLS), relative
+>   redirects in the image's nginx, a startup log without the operator key.
+> - **QMS-only** patches: the UI (`faucet-client/`, `static/`) and its runtime network
+>   presets, the image pipeline (`.github/workflows/qms-faucet-image.yml`), `qms-e2e/`, and
+>   this notice. The server and its modules are otherwise upstream's.
+>
+> It is the source of the faucets QMS runs, offered to their users under AGPL-3.0 §13.
+
 <img src="https://faucets.pk910.de/images/logo-cat-small.png" height="90px" />
 
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/pk910/PoWFaucet?label=Latest%20Release)](https://github.com/pk910/PoWFaucet/releases/latest)
@@ -83,3 +100,15 @@ This faucet contains parts of code from the following projects:
 # License
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+
+Both the upstream work and the QMS modifications are licensed under the GNU Affero General
+Public License v3.0, the text in [LICENSE](LICENSE). Copyright in the upstream work stays
+with its authors.
+
+## Frontend runtime configuration
+
+Docker startup accepts `FAUCET_NETWORK` (`devnet`, `stagenet` or `testnet`),
+`REQUEST_AMOUNT` (requests per period, default `4`), and `REQUEST_CIRCLE`
+(period in hours, default `24`). Request values must be positive integers.
+These update `/config.json` without rebuilding the frontend and control the
+displayed limits; configure backend rate limits separately.
